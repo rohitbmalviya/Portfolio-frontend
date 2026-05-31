@@ -1,0 +1,144 @@
+// ============================================================
+//  lib/api.ts — Typed fetch client for the portfolio backend
+//  Base URL: NEXT_PUBLIC_API_URL (env)
+//  All public reads use ISR (revalidate: 60s) so the public
+//  site is cached and visitors don't hit the live API directly.
+//  Graceful fallback: try/catch returns null on error so the
+//  app still compiles & runs with empty states if API is down.
+//
+//  Response envelope: every backend endpoint returns { data: T }.
+//  apiFetch unwraps the envelope and returns T directly.
+// ============================================================
+
+import type {
+  Page,
+  Project,
+  BlogPost,
+  Skill,
+  Experience,
+  Achievement,
+  SiteSettings,
+} from './types';
+
+const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
+
+// ── Low-level fetch helper ────────────────────────────────────
+
+// All backend responses are wrapped: { data: T }
+interface ApiEnvelope<T> {
+  data: T;
+}
+
+async function apiFetch<T>(
+  path: string,
+  revalidate = 60,
+): Promise<T | null> {
+  try {
+    const res = await fetch(`${BASE_URL}${path}`, {
+      next: { revalidate },
+      headers: { 'Content-Type': 'application/json' },
+    });
+
+    if (!res.ok) {
+      // 404 is a normal "not found" — return null, don't log noisily
+      if (res.status === 404) return null;
+      console.error(`[api] ${path} → HTTP ${res.status}`);
+      return null;
+    }
+
+    // Unwrap { data: T } envelope returned by every backend controller
+    const envelope = (await res.json()) as ApiEnvelope<T>;
+    return envelope.data;
+  } catch (err) {
+    // API is unreachable at build time or runtime — return null gracefully
+    console.warn(`[api] fetch failed for ${path}:`, (err as Error).message);
+    return null;
+  }
+}
+
+// ── Pages ─────────────────────────────────────────────────────
+
+/**
+ * GET /api/pages/:slug — returns the page with its ordered enabled sections.
+ * Used for the Home page and any CMS-driven page.
+ */
+export async function getPage(slug: string): Promise<Page | null> {
+  return apiFetch<Page>(`/api/pages/${slug}`);
+}
+
+/**
+ * GET /api/pages — returns all published pages (for nav/sitemap).
+ */
+export async function getPages(): Promise<Page[]> {
+  const result = await apiFetch<Page[]>('/api/pages');
+  return result ?? [];
+}
+
+// ── Projects ──────────────────────────────────────────────────
+
+/**
+ * GET /api/projects — returns all published projects ordered by `order`.
+ */
+export async function getProjects(): Promise<Project[]> {
+  const result = await apiFetch<Project[]>('/api/projects');
+  return result ?? [];
+}
+
+/**
+ * GET /api/projects/featured — returns only featured projects.
+ */
+export async function getFeaturedProjects(): Promise<Project[]> {
+  const result = await apiFetch<Project[]>('/api/projects?featured=true');
+  return result ?? [];
+}
+
+/**
+ * GET /api/projects/:slug — returns a single project by slug.
+ */
+export async function getProject(slug: string): Promise<Project | null> {
+  return apiFetch<Project>(`/api/projects/${slug}`);
+}
+
+// ── Blog ──────────────────────────────────────────────────────
+
+/**
+ * GET /api/blog — returns all published blog posts, newest first.
+ */
+export async function getBlogPosts(): Promise<BlogPost[]> {
+  const result = await apiFetch<BlogPost[]>('/api/blog');
+  return result ?? [];
+}
+
+/**
+ * GET /api/blog/:slug — returns a single blog post by slug.
+ */
+export async function getBlogPost(slug: string): Promise<BlogPost | null> {
+  return apiFetch<BlogPost>(`/api/blog/${slug}`);
+}
+
+// ── Skills ────────────────────────────────────────────────────
+
+export async function getSkills(): Promise<Skill[]> {
+  const result = await apiFetch<Skill[]>('/api/skills');
+  return result ?? [];
+}
+
+// ── Experience ────────────────────────────────────────────────
+
+export async function getExperience(): Promise<Experience[]> {
+  const result = await apiFetch<Experience[]>('/api/experience');
+  return result ?? [];
+}
+
+// ── Achievements ──────────────────────────────────────────────
+
+export async function getAchievements(): Promise<Achievement[]> {
+  const result = await apiFetch<Achievement[]>('/api/achievements');
+  return result ?? [];
+}
+
+// ── Site Settings ─────────────────────────────────────────────
+
+export async function getSiteSettings(): Promise<SiteSettings | null> {
+  return apiFetch<SiteSettings>('/api/settings', 300); // cache 5 min
+}
