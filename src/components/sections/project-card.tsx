@@ -20,12 +20,19 @@ export function ProjectCard({ project }: ProjectCardProps) {
   return (
     <article
       className={[
-        'bg-[--surface] border border-[--border] rounded-[16px] overflow-hidden',
+        'relative group bg-[--surface] border border-[--border] rounded-[16px] overflow-hidden',
         'transition-all duration-[250ms]',
         'hover:border-[--accent] hover:-translate-y-[4px]',
         'hover:shadow-[var(--card-shadow),0_0_0_1px_var(--accent-glow)]',
       ].join(' ')}
     >
+      {/* Stretched link — the entire card navigates to the detail page */}
+      <Link
+        href={`/projects/${project.slug}`}
+        aria-label={project.title}
+        className="absolute inset-0 z-[1]"
+      />
+
       {/* Thumbnail */}
       <div
         className={[
@@ -57,7 +64,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
       {/* Card body */}
       <div className="px-[22px] pt-5 pb-6">
-        <h3 className="font-display text-[18px] font-semibold mb-[6px] text-[--text] tracking-[-0.3px]">
+        <h3 className="font-display text-[18px] font-semibold mb-[6px] text-[--text] tracking-[-0.3px] group-hover:text-[--accent] transition-colors duration-150">
           {project.title}
         </h3>
         <p className="font-mono text-[13px] text-[--accent] mb-[10px]">{project.role}</p>
@@ -72,26 +79,25 @@ export function ProjectCard({ project }: ProjectCardProps) {
           </div>
         )}
 
-        {/* Links */}
-        <div className="flex flex-wrap items-center gap-[18px] text-[13px] mt-1">
+        {/* Links row sits above the stretched card-link but is itself
+            click-through (pointer-events-none); only "Live demo" opts back in,
+            so clicking anywhere else still navigates to the detail page. */}
+        <div className="relative z-[2] pointer-events-none flex flex-wrap items-center gap-[18px] text-[13px] mt-1">
           {project.liveUrl && (
             <a
               href={project.liveUrl}
               target="_blank"
               rel="noopener noreferrer"
-              className="text-[--accent] hover:opacity-75 transition-opacity flex items-center gap-1"
+              className="pointer-events-auto text-[--accent] hover:opacity-75 transition-opacity flex items-center gap-1"
               aria-label={`${project.title} — live demo (opens in new tab)`}
             >
               Live demo
               <ExternalLink size={12} aria-hidden="true" />
             </a>
           )}
-          <Link
-            href={`/projects/${project.slug}`}
-            className="text-[--muted] hover:text-[--text] transition-colors duration-150"
-          >
+          <span className="text-[--muted] group-hover:text-[--text] transition-colors duration-150">
             Details →
-          </Link>
+          </span>
         </div>
       </div>
     </article>

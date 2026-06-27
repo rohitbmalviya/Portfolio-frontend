@@ -4,13 +4,9 @@
 // ============================================================
 
 import type { Metadata } from 'next';
-import Link from 'next/link';
-import Image from 'next/image';
-import { Calendar, Clock } from 'lucide-react';
 import { getBlogPosts } from '@/lib/api';
 import { FALLBACK_BLOG_POSTS } from '@/lib/fallback-data';
-import { Tag } from '@/components/ui/tag';
-import { formatBlogDate, readingTimeLabel } from '@/lib/utils';
+import { BlogCard } from '@/components/sections/blog-card';
 
 export const revalidate = 60;
 
@@ -44,67 +40,11 @@ export default async function BlogIndexPage() {
           </p>
         </div>
 
-        {/* Posts list */}
+        {/* Posts grid */}
         {posts.length > 0 ? (
-          <div className="space-y-5 max-w-[760px]">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
             {posts.map((post) => (
-              <article
-                key={post.id}
-                className={[
-                  'bg-[--surface] border border-[--border] rounded-[14px] overflow-hidden',
-                  'transition-all duration-[250ms]',
-                  'hover:border-[--accent] hover:-translate-y-[2px]',
-                  'hover:shadow-[var(--card-shadow),0_0_0_1px_var(--accent-glow)]',
-                ].join(' ')}
-              >
-                {/* Cover image */}
-                {post.coverImage && (
-                  <div className="relative h-[200px]">
-                    <Image
-                      src={post.coverImage}
-                      alt={post.title}
-                      fill
-                      sizes="(max-width: 760px) 100vw, 760px"
-                      className="object-cover"
-                    />
-                  </div>
-                )}
-
-                <div className="p-6">
-                  {/* Tags */}
-                  {post.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-2 mb-3">
-                      {post.tags.map((tag) => (
-                        <Tag key={tag}>{tag}</Tag>
-                      ))}
-                    </div>
-                  )}
-
-                  <Link href={`/blog/${post.slug}`} className="group block mb-2">
-                    <h2 className="font-display font-semibold text-[20px] text-[--text] group-hover:text-[--accent] transition-colors duration-150 tracking-[-0.4px] leading-snug">
-                      {post.title}
-                    </h2>
-                  </Link>
-
-                  <p className="text-[--muted] text-[14px] leading-[1.65] mb-4">{post.excerpt}</p>
-
-                  {/* Meta */}
-                  <div className="flex flex-wrap items-center gap-4 text-[12px] text-[--muted] font-mono">
-                    {post.publishedAt && (
-                      <span className="flex items-center gap-1">
-                        <Calendar size={12} aria-hidden="true" />
-                        <time dateTime={post.publishedAt}>{formatBlogDate(post.publishedAt)}</time>
-                      </span>
-                    )}
-                    {post.readingTime && (
-                      <span className="flex items-center gap-1">
-                        <Clock size={12} aria-hidden="true" />
-                        {readingTimeLabel(post.readingTime)}
-                      </span>
-                    )}
-                  </div>
-                </div>
-              </article>
+              <BlogCard key={post.id} post={post} />
             ))}
           </div>
         ) : (

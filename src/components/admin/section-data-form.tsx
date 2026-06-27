@@ -264,19 +264,6 @@ function AboutForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData
   );
 }
 
-// Group key → human label (mirrors skills-section.tsx)
-const SKILL_GROUP_LABELS: Record<string, string> = {
-  LANGUAGES: 'Languages',
-  FRONTEND: 'Frontend',
-  BACKEND: 'Backend',
-  DATA: 'Data',
-  CLOUD_DEVOPS: 'Cloud / DevOps',
-  AI: 'AI / ML',
-};
-
-// Group display order — mirrors the public renderer's GROUP_ORDER
-const SKILLS_GROUP_ORDER = ['LANGUAGES', 'FRONTEND', 'BACKEND', 'DATA', 'CLOUD_DEVOPS', 'AI'];
-
 // Tri-state checkbox: checked / indeterminate / unchecked
 function GroupCheckbox({
   checked,
@@ -303,30 +290,26 @@ function GroupCheckbox({
 }
 
 function SkillsForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
-  const [allSkills, setAllSkills] = useState<Skill[]>([]);
+  const [groupedSkills, setGroupedSkills] = useState<
+    { key: string; label: string; skills: Skill[] }[]
+  >([]);
   const [loadingSkills, setLoadingSkills] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const mode: 'all' | 'selected' = data.mode ?? 'all';
   const selectedIds: string[] = Array.isArray(data.ids) ? (data.ids as string[]) : [];
 
+  // Grouped skills come straight from the API (GET /api/skills/grouped) — no frontend grouping.
   useEffect(() => {
     setLoadingSkills(true);
-    adminSkills.list()
-      .then((skills: Skill[]) => setAllSkills(skills))
+    adminSkills.listGrouped()
+      .then((sections) =>
+        setGroupedSkills(
+          sections.map((s) => ({ key: s.group, label: s.label, skills: s.skills })),
+        ),
+      )
       .catch(() => {})
       .finally(() => setLoadingSkills(false));
   }, []);
-
-  // Ordered groups, each carrying their sorted skills, empty groups hidden
-  const groupedSkills = SKILLS_GROUP_ORDER
-    .map((groupKey) => ({
-      key: groupKey,
-      label: SKILL_GROUP_LABELS[groupKey] ?? groupKey,
-      skills: allSkills
-        .filter((s) => s.group === groupKey)
-        .sort((a, b) => a.order - b.order),
-    }))
-    .filter((g) => g.skills.length > 0);
 
   function toggleSkillId(id: string) {
     const next = selectedIds.includes(id)

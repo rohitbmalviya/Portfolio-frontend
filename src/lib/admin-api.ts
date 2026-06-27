@@ -340,9 +340,7 @@ export const adminBlog = {
 // ── Skills ────────────────────────────────────────────────────
 
 export const adminSkills = {
-  list: () => adminFetch<Skill[]>('/api/skills'),
-
-  /** GET /api/skills/grouped — returns skills pre-grouped in canonical order, empty groups omitted. */
+  /** GET /api/skills/grouped — skills pre-grouped in canonical order, empty groups omitted. */
   listGrouped: () => adminFetch<SkillGroupSection[]>('/api/skills/grouped'),
 
   create: (payload: CreateSkillPayload) =>

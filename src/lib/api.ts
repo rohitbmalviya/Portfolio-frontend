@@ -123,11 +123,6 @@ export async function getBlogPost(slug: string): Promise<BlogPost | null> {
 
 // ── Skills ────────────────────────────────────────────────────
 
-export async function getSkills(): Promise<Skill[]> {
-  const result = await apiFetch<Skill[]>('/api/skills');
-  return result ?? [];
-}
-
 /**
  * GET /api/skills/grouped — returns skills pre-grouped in canonical order
  * (Languages → Frontend → Backend → Data → Cloud/DevOps → AI), empty groups omitted.
