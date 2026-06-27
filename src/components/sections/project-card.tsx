@@ -82,8 +82,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
         {/* Links row sits above the stretched card-link but is itself
             click-through (pointer-events-none); only "Live demo" opts back in,
             so clicking anywhere else still navigates to the detail page. */}
-        <div className="relative z-[2] pointer-events-none flex flex-wrap items-center gap-[18px] text-[13px] mt-1">
-          {project.liveUrl && (
+        {project.liveUrl && (
+          <div className="relative z-[2] pointer-events-none flex flex-wrap items-center gap-[18px] text-[13px] mt-1">
             <a
               href={project.liveUrl}
               target="_blank"
@@ -94,11 +94,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
               Live demo
               <ExternalLink size={12} aria-hidden="true" />
             </a>
-          )}
-          <span className="text-[--muted] group-hover:text-[--text] transition-colors duration-150">
-            Details →
-          </span>
-        </div>
+          </div>
+        )}
       </div>
     </article>
   );
