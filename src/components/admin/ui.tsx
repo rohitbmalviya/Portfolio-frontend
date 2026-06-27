@@ -7,7 +7,7 @@
 // ============================================================
 
 import { forwardRef, useId, useState } from 'react';
-import { AlertTriangle, Loader2 } from 'lucide-react';
+import { AlertTriangle, Check, ChevronDown, Loader2, Plus, Trash2, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 // ── AdminInput ────────────────────────────────────────────────
@@ -78,7 +78,7 @@ interface AdminTextareaProps extends React.TextareaHTMLAttributes<HTMLTextAreaEl
 }
 
 export const AdminTextarea = forwardRef<HTMLTextAreaElement, AdminTextareaProps>(
-  ({ label, error, hint, className, id, ...props }, ref) => {
+  ({ label, error, hint, className, id, style, ...props }, ref) => {
     const generatedId = useId();
     const inputId = id ?? `ta-${generatedId}`;
     return (
@@ -109,6 +109,9 @@ export const AdminTextarea = forwardRef<HTMLTextAreaElement, AdminTextareaProps>
             borderColor: error ? 'rgba(239,68,68,0.5)' : 'var(--border)',
             color: 'var(--text)',
             fontFamily: 'var(--font-inter)',
+            // Caller overrides (e.g. custom fontFamily/fontSize) are spread last
+            // so they win, but the theme tokens above are always the baseline.
+            ...style,
           }}
           aria-describedby={error ? `${inputId}-error` : hint ? `${inputId}-hint` : undefined}
           aria-invalid={error ? true : undefined}
@@ -153,29 +156,37 @@ export const AdminSelect = forwardRef<HTMLSelectElement, AdminSelectProps>(
             {label}
           </label>
         )}
-        <select
-          ref={ref}
-          id={inputId}
-          className={cn(
-            'w-full px-3 py-2.5 rounded-[10px] border text-[14px] outline-none',
-            'transition-colors duration-150 cursor-pointer',
-            'focus:border-[--accent]',
-            className,
-          )}
-          style={{
-            backgroundColor: 'var(--surface-2)',
-            borderColor: error ? 'rgba(239,68,68,0.5)' : 'var(--border)',
-            color: 'var(--text)',
-          }}
-          aria-invalid={error ? true : undefined}
-          {...props}
-        >
-          {options.map((o) => (
-            <option key={o.value} value={o.value}>
-              {o.label}
-            </option>
-          ))}
-        </select>
+        <div className="relative">
+          <select
+            ref={ref}
+            id={inputId}
+            className={cn(
+              'w-full px-3 py-2.5 pr-9 rounded-[10px] border text-[14px] outline-none',
+              'transition-colors duration-150 cursor-pointer appearance-none',
+              'focus:border-[--accent]',
+              className,
+            )}
+            style={{
+              backgroundColor: 'var(--surface-2)',
+              borderColor: error ? 'rgba(239,68,68,0.5)' : 'var(--border)',
+              color: 'var(--text)',
+            }}
+            aria-invalid={error ? true : undefined}
+            {...props}
+          >
+            {options.map((o) => (
+              <option key={o.value} value={o.value}>
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <ChevronDown
+            size={15}
+            aria-hidden="true"
+            className="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2"
+            style={{ color: 'var(--muted)' }}
+          />
+        </div>
         {error && (
           <p className="text-[12px]" style={{ color: '#f87171' }} role="alert">
             {error}
@@ -325,7 +336,7 @@ export function AdminButton({
   ...props
 }: AdminButtonProps) {
   const base =
-    'inline-flex items-center justify-center gap-2 font-semibold rounded-[10px] border transition-all duration-200 cursor-pointer';
+    'inline-flex items-center justify-center gap-1.5 leading-none font-semibold rounded-[10px] border transition-all duration-200 cursor-pointer';
 
   const variants = {
     primary: 'bg-[var(--accent-dim)] border-[var(--accent)] text-[var(--accent)] hover:shadow-[0_0_24px_var(--accent-glow)]',
@@ -334,8 +345,8 @@ export function AdminButton({
   };
 
   const sizes = {
-    sm: 'px-3 py-1.5 text-[13px]',
-    md: 'px-4 py-2 text-[13px]',
+    sm: 'h-8 px-3 text-[13px]',
+    md: 'h-9 px-4 text-[13px]',
   };
 
   return (
@@ -430,6 +441,7 @@ export function ConfirmDialog({
 
         <div className="flex gap-2 justify-end">
           <AdminButton variant="ghost" size="sm" onClick={onCancel} disabled={loading}>
+            <X size={13} aria-hidden="true" />
             Cancel
           </AdminButton>
           <AdminButton
@@ -438,6 +450,7 @@ export function ConfirmDialog({
             onClick={onConfirm}
             loading={loading}
           >
+            <Trash2 size={13} aria-hidden="true" />
             {confirmLabel}
           </AdminButton>
         </div>
@@ -578,7 +591,7 @@ export function TagsInput({
               aria-label={`Remove tag ${tag}`}
               className="hover:opacity-70 transition-opacity"
             >
-              ×
+              <X size={11} aria-hidden="true" />
             </button>
           </span>
         ))}
@@ -662,20 +675,20 @@ export function BulletsInput({
               type="button"
               onClick={() => onChange(value.filter((_, j) => j !== i))}
               aria-label="Remove bullet"
-              className="text-[var(--muted)] hover:text-red-400 transition-colors text-[18px] leading-none"
+              className="text-[var(--muted)] hover:text-red-400 transition-colors"
             >
-              ×
+              <X size={13} aria-hidden="true" />
             </button>
           </div>
         ))}
-        <div className="flex gap-2">
+        <div className="flex gap-2 items-stretch">
           <input
             type="text"
             value={input}
             onChange={(e) => setInput(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), add())}
             placeholder={placeholder}
-            className="flex-1 px-3 py-2 rounded-[8px] border text-[13px] outline-none focus:border-[var(--accent)] transition-colors"
+            className="flex-1 h-9 px-3 rounded-[8px] border text-[13px] outline-none focus:border-[var(--accent)] transition-colors"
             style={{
               backgroundColor: 'var(--surface-2)',
               borderColor: 'var(--border)',
@@ -683,7 +696,8 @@ export function BulletsInput({
             }}
             aria-label="Add new bullet"
           />
-          <AdminButton size="sm" variant="ghost" onClick={add} type="button">
+          <AdminButton variant="ghost" onClick={add} type="button">
+            <Plus size={13} aria-hidden="true" />
             Add
           </AdminButton>
         </div>

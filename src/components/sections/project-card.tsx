@@ -7,8 +7,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { ExternalLink, Star } from 'lucide-react';
-import { Tag, Pill } from '@/components/ui/tag';
-import { proofLabel } from '@/lib/utils';
+import { Tag } from '@/components/ui/tag';
 import type { Project } from '@/lib/types';
 
 interface ProjectCardProps {
@@ -16,8 +15,6 @@ interface ProjectCardProps {
 }
 
 export function ProjectCard({ project }: ProjectCardProps) {
-  const label = proofLabel(project.proofType);
-  const isArch = project.proofType === 'ARCHITECTURE';
   const hasScreenshot = project.screenshots && project.screenshots.length > 0;
 
   return (
@@ -47,12 +44,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             className="object-cover"
           />
         ) : (
-          <span className="select-none">{isArch ? '[ system diagram ]' : '[ screenshot ]'}</span>
-        )}
-
-        {/* Proof label pill */}
-        {label && (
-          <Pill className="absolute top-3 left-3">{label}</Pill>
+          <span className="select-none">[ screenshot ]</span>
         )}
 
         {/* Featured star */}
@@ -82,7 +74,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
         {/* Links */}
         <div className="flex flex-wrap items-center gap-[18px] text-[13px] mt-1">
-          {project.liveUrl && project.proofType !== 'ARCHITECTURE' && (
+          {project.liveUrl && (
             <a
               href={project.liveUrl}
               target="_blank"
@@ -98,7 +90,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
             href={`/projects/${project.slug}`}
             className="text-[--muted] hover:text-[--text] transition-colors duration-150"
           >
-            {isArch ? 'Architecture & role →' : 'Details →'}
+            Details →
           </Link>
         </div>
       </div>

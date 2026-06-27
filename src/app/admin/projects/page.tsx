@@ -7,7 +7,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, FolderKanban, Star, Globe, GripVertical, ChevronUp, ChevronDown } from 'lucide-react';
+import { ChevronDown, ChevronUp, FolderKanban, Globe, GripVertical, Pencil, Plus, Star, Trash2 } from 'lucide-react';
 import { adminProjects } from '@/lib/admin-api';
 import type { Project } from '@/lib/types';
 import { AdminShell } from '@/components/admin/admin-shell';
@@ -159,7 +159,7 @@ function ProjectsContent() {
                   )}
                 </div>
                 <p className="text-[12px] mt-0.5 font-mono truncate" style={{ color: 'var(--muted)' }}>
-                  {project.slug} · {project.proofType}
+                  {project.slug}
                 </p>
               </div>
 
@@ -172,6 +172,7 @@ function ProjectsContent() {
                   title={project.featured ? 'Unfeature' : 'Feature'}
                 >
                   <Star size={13} aria-hidden="true" className={project.featured ? 'fill-current' : ''} />
+                  {project.featured ? 'Unfeature' : 'Feature'}
                 </AdminButton>
                 <AdminButton
                   variant="ghost"
@@ -183,14 +184,16 @@ function ProjectsContent() {
                   {project.published ? 'Unpublish' : 'Publish'}
                 </AdminButton>
                 <Link href={`/admin/projects/${project.id}`}>
-                  <AdminButton variant="ghost" size="sm" type="button">Edit</AdminButton>
+                  <AdminButton variant="ghost" size="sm" type="button">
+                    <Pencil size={13} aria-hidden="true" /> Edit
+                  </AdminButton>
                 </Link>
                 <AdminButton
                   variant="danger"
                   size="sm"
                   onClick={() => setDeleteTarget(project)}
                 >
-                  Delete
+                  <Trash2 size={13} aria-hidden="true" /> Delete
                 </AdminButton>
               </div>
             </AdminCard>

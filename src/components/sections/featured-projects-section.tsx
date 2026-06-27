@@ -21,13 +21,28 @@ export async function FeaturedProjectsSection({ data, sectionNumber }: FeaturedP
   if (projects.length === 0) projects = FALLBACK_PROJECTS;
 
   const limit = data.limit ?? 4;
-  let featured = projects.filter((p) => p.featured).slice(0, limit);
-  if (featured.length === 0) featured = projects.slice(0, limit);
+  let featured: typeof projects;
 
-  // If specific IDs are specified, use those
-  if (data.projectIds && data.projectIds.length > 0) {
-    const idSet = new Set(data.projectIds);
-    featured = projects.filter((p) => idSet.has(p.id)).slice(0, limit);
+  if (data.mode === 'selected') {
+    // Prefer data.ids (new); fall back to legacy data.projectIds
+    const idsToUse =
+      data.ids && data.ids.length > 0 ? data.ids
+        : data.projectIds && data.projectIds.length > 0 ? data.projectIds
+        : [];
+    if (idsToUse.length > 0) {
+      const idSet = new Set(idsToUse);
+      featured = projects.filter((p) => idSet.has(p.id));
+    } else {
+      featured = projects.slice(0, limit);
+    }
+  } else {
+    // Default: auto-select featured projects; legacy projectIds honored for old data
+    featured = projects.filter((p) => p.featured).slice(0, limit);
+    if (featured.length === 0) featured = projects.slice(0, limit);
+    if (data.projectIds && data.projectIds.length > 0) {
+      const idSet = new Set(data.projectIds);
+      featured = projects.filter((p) => idSet.has(p.id)).slice(0, limit);
+    }
   }
 
   return (

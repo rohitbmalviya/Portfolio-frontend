@@ -12,17 +12,19 @@ import {
   Rss,
   Wrench,
   Briefcase,
+  GraduationCap,
   Trophy,
   Image,
   ArrowRight,
   Globe,
 } from 'lucide-react';
-import { adminPages, adminProjects, adminBlog, adminSkills, adminExperience, adminAchievements, adminMedia } from '@/lib/admin-api';
+import { adminStats, type DashboardCounts } from '@/lib/admin-api';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider } from '@/components/admin/toast';
 import { AdminCard } from '@/components/admin/ui';
 
 interface StatCard {
+  key: keyof DashboardCounts;
   label: string;
   count: number | null;
   href: string;
@@ -30,39 +32,30 @@ interface StatCard {
   accent?: boolean;
 }
 
+const STAT_CARDS: StatCard[] = [
+  { key: 'pages', label: 'Pages', count: null, href: '/admin/pages', icon: FileText },
+  { key: 'projects', label: 'Projects', count: null, href: '/admin/projects', icon: FolderKanban },
+  { key: 'blogPosts', label: 'Blog Posts', count: null, href: '/admin/blog', icon: Rss },
+  { key: 'skills', label: 'Skills', count: null, href: '/admin/skills', icon: Wrench },
+  { key: 'experience', label: 'Experience', count: null, href: '/admin/experience', icon: Briefcase },
+  { key: 'education', label: 'Education', count: null, href: '/admin/education', icon: GraduationCap },
+  { key: 'achievements', label: 'Achievements', count: null, href: '/admin/achievements', icon: Trophy },
+  { key: 'media', label: 'Media', count: null, href: '/admin/media', icon: Image },
+];
+
 function DashboardContent() {
-  const [stats, setStats] = useState<StatCard[]>([
-    { label: 'Pages', count: null, href: '/admin/pages', icon: FileText },
-    { label: 'Projects', count: null, href: '/admin/projects', icon: FolderKanban },
-    { label: 'Blog Posts', count: null, href: '/admin/blog', icon: Rss },
-    { label: 'Skills', count: null, href: '/admin/skills', icon: Wrench },
-    { label: 'Experience', count: null, href: '/admin/experience', icon: Briefcase },
-    { label: 'Achievements', count: null, href: '/admin/achievements', icon: Trophy },
-    { label: 'Media', count: null, href: '/admin/media', icon: Image },
-  ]);
+  const [stats, setStats] = useState<StatCard[]>(STAT_CARDS);
 
   useEffect(() => {
-    Promise.allSettled([
-      adminPages.list(),
-      adminProjects.list(),
-      adminBlog.list(),
-      adminSkills.list(),
-      adminExperience.list(),
-      adminAchievements.list(),
-      adminMedia.list(),
-    ]).then((results) => {
-      setStats((prev) =>
-        prev.map((s, i) => ({
-          ...s,
-          count:
-            results[i].status === 'fulfilled'
-              ? Array.isArray(results[i].value)
-                ? (results[i].value as unknown[]).length
-                : 0
-              : 0,
-        })),
-      );
-    });
+    // Single API call returns ALL content counts (replaces 7 list calls).
+    adminStats
+      .get()
+      .then((counts) => {
+        setStats(STAT_CARDS.map((s) => ({ ...s, count: counts[s.key] ?? 0 })));
+      })
+      .catch(() => {
+        setStats(STAT_CARDS.map((s) => ({ ...s, count: 0 })));
+      });
   }, []);
 
   const quickLinks = [

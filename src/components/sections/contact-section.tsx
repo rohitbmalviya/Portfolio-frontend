@@ -1,19 +1,62 @@
 // ============================================================
-//  ContactSection — mailto CTA + social links + resume download.
+//  ContactSection — mailto CTA + dynamic links + resume download.
 //  Server component.
 // ============================================================
 
-import { Mail, Github, Linkedin, Twitter, Download, MapPin } from 'lucide-react';
+import {
+  Mail,
+  Github,
+  Linkedin,
+  Twitter,
+  Download,
+  FileText,
+  MapPin,
+  Phone,
+  Globe,
+  Instagram,
+  Youtube,
+  ExternalLink,
+} from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { LinkButton } from '@/components/ui/button';
+import { ContactForm } from './contact-form';
 import type { ContactData } from '@/lib/types';
 
-const SOCIAL_ICONS: Record<string, React.ComponentType<{ size?: number; 'aria-hidden'?: 'true' }>> = {
+// ── Icon map for both legacy socials and new links ────────────
+
+type IconComponent = React.ComponentType<{ size?: number; 'aria-hidden'?: 'true' }>;
+
+const LINK_ICONS: Record<string, IconComponent> = {
+  email: Mail,
+  phone: Phone,
+  website: Globe,
+  linkedin: Linkedin,
+  github: Github,
+  twitter: Twitter,
+  instagram: Instagram,
+  youtube: Youtube,
+  resume: FileText,
+};
+
+/** Kept for backward-compat with legacy `data.socials` key names */
+const LEGACY_SOCIAL_ICONS: Record<string, IconComponent> = {
   github: Github,
   linkedin: Linkedin,
   twitter: Twitter,
   email: Mail,
 };
+
+function getLinkHref(type: string, value: string): string {
+  if (type === 'email') return `mailto:${value}`;
+  if (type === 'phone') return `tel:${value}`;
+  return value;
+}
+
+function isExternalHref(type: string): boolean {
+  return type !== 'email' && type !== 'phone';
+}
+
+// ── Component ─────────────────────────────────────────────────
 
 interface ContactSectionProps {
   data: ContactData;
@@ -21,8 +64,25 @@ interface ContactSectionProps {
 }
 
 export function ContactSection({ data, sectionNumber }: ContactSectionProps) {
-  const email = data.email ?? process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? 'rohitbmalviya@gmail.com';
-  const resumeUrl = data.resumeUrl ?? '/resume.pdf';
+  // Derive the primary email: prefer a link of type 'email', then legacy
+  // data.email, then env var, then hardcoded fallback.
+  const emailLink = data.links?.find((l) => l.type === 'email');
+  const email =
+    emailLink?.value ??
+    data.email ??
+    process.env.NEXT_PUBLIC_CONTACT_EMAIL ??
+    'rohitbmalviya@gmail.com';
+
+  // If there is a resume-type link in data.links, that takes precedence.
+  // Otherwise, fall back to the legacy data.resumeUrl field for backward-compat.
+  const hasResumeLink = data.links?.some((l) => l.type === 'resume') ?? false;
+  const legacyResumeUrl = !hasResumeLink && data.resumeUrl ? data.resumeUrl : null;
+
+  // Links to display in the links row: if `data.links` is defined use those
+  // (filtering out the email entry because it's already shown in the CTA
+  // button above); otherwise fall back to legacy `data.socials`.
+  const hasNewLinks = Array.isArray(data.links) && data.links.length > 0;
+  const nonEmailLinks = data.links?.filter((l) => l.type !== 'email') ?? [];
 
   return (
     <section className="py-16" id="contact" aria-labelledby="contact-heading">
@@ -33,6 +93,9 @@ export function ContactSection({ data, sectionNumber }: ContactSectionProps) {
           {data.blurb && (
             <p className="text-[--muted] text-[16px] leading-[1.7]">{data.blurb}</p>
           )}
+
+          {/* Interactive contact form — only when enabled in the section */}
+          {data.showForm && <ContactForm email={email} />}
 
           {/* Primary email CTA */}
           <div className="flex flex-wrap items-center gap-4">
@@ -45,9 +108,9 @@ export function ContactSection({ data, sectionNumber }: ContactSectionProps) {
               {email}
             </LinkButton>
 
-            {resumeUrl && (
+            {legacyResumeUrl && (
               <LinkButton
-                href={resumeUrl}
+                href={legacyResumeUrl}
                 target="_blank"
                 rel="noopener noreferrer"
                 variant="ghost"
@@ -65,12 +128,40 @@ export function ContactSection({ data, sectionNumber }: ContactSectionProps) {
             Pune, India
           </p>
 
-          {/* Social links */}
-          {data.socials && Object.keys(data.socials).length > 0 && (
+          {/* Links row — new dynamic list if present, legacy socials otherwise */}
+          {hasNewLinks && nonEmailLinks.length > 0 ? (
+            <div className="flex flex-wrap items-center gap-5">
+              {nonEmailLinks.map((link, i) => {
+                const Icon: IconComponent = LINK_ICONS[link.type] ?? ExternalLink;
+                const href = getLinkHref(link.type, link.value);
+                const external = isExternalHref(link.type);
+                // Show the raw value for phone, friendly label for resume, type name for URLs
+                const label =
+                  link.type === 'phone' ? link.value :
+                  link.type === 'resume' ? 'Resume / CV' :
+                  link.type;
+                return (
+                  <a
+                    key={i}
+                    href={href}
+                    target={external ? '_blank' : undefined}
+                    rel={external ? 'noopener noreferrer' : undefined}
+                    aria-label={link.type.charAt(0).toUpperCase() + link.type.slice(1)}
+                    className="text-[--muted] hover:text-[--accent] transition-colors duration-150 flex items-center gap-2 font-mono text-[13px]"
+                  >
+                    <Icon size={16} aria-hidden="true" />
+                    {label}
+                  </a>
+                );
+              })}
+            </div>
+          ) : !hasNewLinks && data.socials && Object.keys(data.socials).length > 0 ? (
+            /* Backward-compat: render legacy socials object */
             <div className="flex items-center gap-5">
               {Object.entries(data.socials).map(([key, href]) => {
                 if (!href) return null;
-                const Icon = SOCIAL_ICONS[key.toLowerCase()] ?? Mail;
+                const Icon: IconComponent =
+                  LEGACY_SOCIAL_ICONS[key.toLowerCase()] ?? Mail;
                 return (
                   <a
                     key={key}
@@ -86,7 +177,7 @@ export function ContactSection({ data, sectionNumber }: ContactSectionProps) {
                 );
               })}
             </div>
-          )}
+          ) : null}
         </div>
       </div>
     </section>

@@ -16,6 +16,7 @@ import { Calendar, Clock, ArrowLeft } from 'lucide-react';
 import { getBlogPost, getBlogPosts } from '@/lib/api';
 import { FALLBACK_BLOG_POSTS } from '@/lib/fallback-data';
 import { Tag } from '@/components/ui/tag';
+import { ScreenshotLightbox, LightboxTrigger, LightboxImg } from '@/components/projects/screenshot-lightbox';
 import { formatBlogDate, readingTimeLabel } from '@/lib/utils';
 
 export const revalidate = 60;
@@ -65,6 +66,15 @@ export default async function BlogPostPage({ params }: Props) {
 
   if (!post) notFound();
 
+  // All zoomable images on this post: cover first, then markdown body images.
+  const bodyImageUrls = post.body
+    ? [...post.body.matchAll(/!\[[^\]]*\]\(([^)\s]+)/g)].map((m) => m[1])
+    : [];
+  const lightboxImages = [
+    ...(post.coverImage ? [{ url: post.coverImage, alt: post.title }] : []),
+    ...bodyImageUrls.map((url) => ({ url, alt: '' })),
+  ];
+
   return (
     <div className="py-12">
       <div className="wrap">
@@ -77,6 +87,7 @@ export default async function BlogPostPage({ params }: Props) {
           Back to blog
         </Link>
 
+        <ScreenshotLightbox screenshots={lightboxImages}>
         <article className="max-w-[720px]">
           {/* Header */}
           <header className="mb-10">
@@ -121,6 +132,11 @@ export default async function BlogPostPage({ params }: Props) {
                 className="object-cover"
                 priority
               />
+              <LightboxTrigger
+                index={0}
+                ariaLabel="View cover image full size"
+                className="absolute inset-0 z-10 cursor-zoom-in transition-colors hover:bg-black/10"
+              />
             </div>
           )}
 
@@ -135,6 +151,7 @@ export default async function BlogPostPage({ params }: Props) {
               <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
                 rehypePlugins={[rehypeSlug, rehypeHighlight]}
+                components={{ img: LightboxImg }}
               >
                 {post.body}
               </ReactMarkdown>
@@ -148,6 +165,7 @@ export default async function BlogPostPage({ params }: Props) {
             </div>
           )}
         </article>
+        </ScreenshotLightbox>
       </div>
     </div>
   );

@@ -15,7 +15,7 @@ export function AboutSection({ data, sectionNumber }: AboutSectionProps) {
     <section className="py-16" id="about" aria-labelledby="about-heading">
       <div className="wrap">
         <SectionHeading number={sectionNumber} title={data.heading || 'About'} />
-        <div className="max-w-[680px] space-y-4">
+        <div className="space-y-4">
           {(data.paragraphs ?? []).map((para, i) => (
             <p key={i} className="text-[--muted] text-[16px] leading-[1.7]">
               {para}

@@ -1,13 +1,18 @@
 'use client';
 
 // ============================================================
-//  Admin Skills CRUD — list + inline create/edit + reorder
+//  Admin Skills CRUD — grouped list + inline create/edit + reorder
+//  Data source: GET /api/skills/grouped (SkillGroupSection[]).
+//  After every mutation the page re-fetches listGrouped() so
+//  the displayed groups always reflect the authoritative server
+//  order — no client-side group juggling required.
 // ============================================================
 
 import { useEffect, useState } from 'react';
 import { Plus, Wrench, ChevronUp, ChevronDown, Pencil, Trash2, Save, X } from 'lucide-react';
 import { adminSkills } from '@/lib/admin-api';
-import type { Skill, SkillGroup, SkillLevel } from '@/lib/types';
+import type { Skill, SkillGroup, SkillLevel, SkillGroupSection } from '@/lib/types';
+import { SkillIcon } from '@/components/ui/skill-icon';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
 import {
@@ -21,6 +26,7 @@ import {
   EmptyState,
 } from '@/components/admin/ui';
 
+// Keep GROUP_OPTIONS only for the create/edit form's Group dropdown.
 const GROUP_OPTIONS: { value: SkillGroup; label: string }[] = [
   { value: 'LANGUAGES', label: 'Languages' },
   { value: 'FRONTEND', label: 'Frontend' },
@@ -59,31 +65,52 @@ const EMPTY_EDIT: EditingSkill = {
 
 function SkillsContent() {
   const { success, error: toastError } = useToast();
-  const [skills, setSkills] = useState<Skill[]>([]);
+  const [sections, setSections] = useState<SkillGroupSection[]>([]);
   const [loading, setLoading] = useState(true);
   const [editing, setEditing] = useState<EditingSkill | null>(null);
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Skill | null>(null);
   const [deleting, setDeleting] = useState(false);
 
+  // Total skill count across all groups — used as the `order` value for new skills.
+  const totalSkills = sections.reduce((sum, s) => sum + s.skills.length, 0);
+
+  // Re-fetch the grouped list from the API and update state.
+  // Called after every mutation so the displayed groups always match the server.
+  async function refetch() {
+    const data = await adminSkills.listGrouped();
+    setSections(data);
+  }
+
   useEffect(() => {
     setLoading(true);
     adminSkills
-      .list()
-      .then((data) => setSkills([...data].sort((a, b) => a.order - b.order)))
+      .listGrouped()
+      .then((data) => setSections(data))
       .catch((err) => toastError(err instanceof Error ? err.message : 'Failed to load.'))
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  async function move(index: number, dir: -1 | 1) {
-    const next = [...skills];
-    const t = index + dir;
-    if (t < 0 || t >= next.length) return;
-    [next[index], next[t]] = [next[t], next[index]];
-    const ri = next.map((s, i) => ({ ...s, order: i }));
-    setSkills(ri);
+  // Reorder within a group: swap the order values of two adjacent skills,
+  // persist via the reorder endpoint, then re-fetch to sync state.
+  async function move(skill: Skill, dir: -1 | 1) {
+    const section = sections.find((sec) => sec.group === skill.group);
+    if (!section) return;
+
+    // section.skills is already sorted by `order` (the API guarantees this).
+    const groupSkills = section.skills;
+    const idx = groupSkills.findIndex((s) => s.id === skill.id);
+    const t = idx + dir;
+    if (t < 0 || t >= groupSkills.length) return;
+
+    const a = groupSkills[idx];
+    const b = groupSkills[t];
     try {
-      await adminSkills.reorder(ri.map((s) => ({ id: s.id, order: s.order })));
+      await adminSkills.reorder([
+        { id: a.id, order: b.order },
+        { id: b.id, order: a.order },
+      ]);
+      await refetch();
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Reorder failed.');
     }
@@ -94,24 +121,23 @@ function SkillsContent() {
     setSaving(true);
     try {
       if (editing.id) {
-        const updated = await adminSkills.update(editing.id, {
+        await adminSkills.update(editing.id, {
           name: editing.name,
           group: editing.group,
           level: editing.level,
         });
-        setSkills((p) => p.map((s) => (s.id === editing.id ? updated : s)));
         success('Skill updated.');
       } else {
-        const created = await adminSkills.create({
+        await adminSkills.create({
           name: editing.name,
           group: editing.group,
           level: editing.level,
-          order: skills.length,
+          order: totalSkills,
         });
-        setSkills((p) => [...p, created]);
         success('Skill added.');
       }
       setEditing(null);
+      await refetch();
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Save failed.');
     } finally {
@@ -124,9 +150,9 @@ function SkillsContent() {
     setDeleting(true);
     try {
       await adminSkills.delete(deleteTarget.id);
-      setSkills((p) => p.filter((s) => s.id !== deleteTarget.id));
       setDeleteTarget(null);
       success('Skill deleted.');
+      await refetch();
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Delete failed.');
     } finally {
@@ -139,7 +165,7 @@ function SkillsContent() {
       title="Skills"
       description="Manage skill groups, levels and order."
       actions={
-        <AdminButton onClick={() => setEditing({ ...EMPTY_EDIT, order: skills.length })}>
+        <AdminButton onClick={() => setEditing({ ...EMPTY_EDIT, order: totalSkills })}>
           <Plus size={14} aria-hidden="true" /> Add skill
         </AdminButton>
       }
@@ -170,12 +196,12 @@ function SkillsContent() {
               options={LEVEL_OPTIONS}
             />
           </div>
-          <div className="flex gap-2 justify-end mt-4">
-            <AdminButton variant="ghost" size="sm" onClick={() => setEditing(null)}>
-              <X size={13} aria-hidden="true" /> Cancel
+          <div className="flex gap-2 justify-end items-center mt-4">
+            <AdminButton variant="ghost" onClick={() => setEditing(null)}>
+              <X size={14} aria-hidden="true" /> Cancel
             </AdminButton>
-            <AdminButton size="sm" loading={saving} onClick={handleSave} type="button">
-              <Save size={13} aria-hidden="true" />
+            <AdminButton loading={saving} onClick={handleSave} type="button">
+              <Save size={14} aria-hidden="true" />
               {editing.id ? 'Update' : 'Add skill'}
             </AdminButton>
           </div>
@@ -184,7 +210,7 @@ function SkillsContent() {
 
       {loading ? (
         <LoadingRows />
-      ) : skills.length === 0 ? (
+      ) : sections.length === 0 ? (
         <EmptyState
           icon={<Wrench size={20} />}
           title="No skills yet"
@@ -195,53 +221,91 @@ function SkillsContent() {
           }
         />
       ) : (
-        <div className="flex flex-col gap-2">
-          {skills.map((skill, index) => (
-            <AdminCard key={skill.id} className="flex items-center gap-3">
-              <div className="flex flex-col gap-0.5 shrink-0">
-                <button type="button" onClick={() => move(index, -1)} disabled={index === 0}
-                  className="disabled:opacity-30" aria-label="Move up" style={{ color: 'var(--muted)' }}>
-                  <ChevronUp size={13} />
-                </button>
-                <button type="button" onClick={() => move(index, 1)} disabled={index === skills.length - 1}
-                  className="disabled:opacity-30" aria-label="Move down" style={{ color: 'var(--muted)' }}>
-                  <ChevronDown size={13} />
-                </button>
-              </div>
-              <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
-                <span className="text-[14px] font-medium" style={{ color: 'var(--text)' }}>
-                  {skill.name}
+        <div className="flex flex-col gap-8">
+          {sections.map((section) => (
+            <section key={section.group}>
+              <div className="flex items-center gap-2 mb-3">
+                <h2
+                  className="text-[12px] font-semibold uppercase tracking-widest"
+                  style={{ color: 'var(--muted)' }}
+                >
+                  {section.label}
+                </h2>
+                <span
+                  className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] border font-medium"
+                  style={{
+                    backgroundColor: 'var(--surface-2)',
+                    borderColor: 'var(--border)',
+                    color: 'var(--muted)',
+                  }}
+                >
+                  {section.skills.length}
                 </span>
-                <AdminBadge variant="muted">{skill.group}</AdminBadge>
-                <AdminBadge variant={LEVEL_BADGE[skill.level]}>{skill.level}</AdminBadge>
               </div>
-              <div className="flex gap-1.5 shrink-0">
-                <AdminButton
-                  variant="ghost"
-                  size="sm"
-                  onClick={() =>
-                    setEditing({
-                      id: skill.id,
-                      name: skill.name,
-                      group: skill.group,
-                      level: skill.level,
-                      order: skill.order,
-                    })
-                  }
-                  aria-label="Edit skill"
-                >
-                  <Pencil size={13} aria-hidden="true" />
-                </AdminButton>
-                <AdminButton
-                  variant="danger"
-                  size="sm"
-                  onClick={() => setDeleteTarget(skill)}
-                  aria-label="Delete skill"
-                >
-                  <Trash2 size={13} aria-hidden="true" />
-                </AdminButton>
+
+              <div className="flex flex-col gap-2">
+                {section.skills.map((skill, idx) => (
+                  <AdminCard key={skill.id} className="flex items-center gap-3">
+                    <div className="flex flex-col gap-0.5 shrink-0">
+                      <button
+                        type="button"
+                        onClick={() => move(skill, -1)}
+                        disabled={idx === 0}
+                        className="disabled:opacity-30"
+                        aria-label="Move up"
+                        style={{ color: 'var(--muted)' }}
+                      >
+                        <ChevronUp size={13} />
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => move(skill, 1)}
+                        disabled={idx === section.skills.length - 1}
+                        className="disabled:opacity-30"
+                        aria-label="Move down"
+                        style={{ color: 'var(--muted)' }}
+                      >
+                        <ChevronDown size={13} />
+                      </button>
+                    </div>
+                    <div className="flex-1 min-w-0 flex items-center gap-2 flex-wrap">
+                      <span
+                        className="text-[14px] font-medium inline-flex items-center gap-1.5"
+                        style={{ color: 'var(--text)' }}
+                      >
+                        <SkillIcon name={skill.name} size={15} />
+                        {skill.name}
+                      </span>
+                      <AdminBadge variant={LEVEL_BADGE[skill.level]}>{skill.level}</AdminBadge>
+                    </div>
+                    <div className="flex gap-1.5 shrink-0">
+                      <AdminButton
+                        variant="ghost"
+                        size="sm"
+                        onClick={() =>
+                          setEditing({
+                            id: skill.id,
+                            name: skill.name,
+                            group: skill.group,
+                            level: skill.level,
+                            order: skill.order,
+                          })
+                        }
+                      >
+                        <Pencil size={13} aria-hidden="true" /> Edit
+                      </AdminButton>
+                      <AdminButton
+                        variant="danger"
+                        size="sm"
+                        onClick={() => setDeleteTarget(skill)}
+                      >
+                        <Trash2 size={13} aria-hidden="true" /> Delete
+                      </AdminButton>
+                    </div>
+                  </AdminCard>
+                ))}
               </div>
-            </AdminCard>
+            </section>
           ))}
         </div>
       )}

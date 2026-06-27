@@ -3,6 +3,7 @@
 //  Fetches from API or falls back. Server component.
 // ============================================================
 
+import { Building2 } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { getExperience } from '@/lib/api';
 import { FALLBACK_EXPERIENCE } from '@/lib/fallback-data';
@@ -16,7 +17,13 @@ interface ExperienceSectionProps {
 
 export async function ExperienceSection({ data, sectionNumber }: ExperienceSectionProps) {
   const fetched = await getExperience();
-  const experiences = fetched.length > 0 ? fetched : FALLBACK_EXPERIENCE;
+  const all = fetched.length > 0 ? fetched : FALLBACK_EXPERIENCE;
+
+  // Honor selection filter; default (mode absent or 'all') = show everything
+  const experiences =
+    data.mode === 'selected' && data.ids && data.ids.length > 0
+      ? (() => { const idSet = new Set(data.ids); return all.filter((e) => idSet.has(e.id)); })()
+      : all;
 
   return (
     <section className="py-16" id="experience" aria-labelledby="experience-heading">
@@ -29,25 +36,44 @@ export async function ExperienceSection({ data, sectionNumber }: ExperienceSecti
               key={exp.id}
               className="relative pl-6 border-l-2 border-[--border]"
             >
-              {/* Dot */}
+              {/* Timeline dot — always present */}
               <span
                 className="absolute -left-[5px] top-1 w-[9px] h-[9px] rounded-full bg-[--accent]"
                 aria-hidden="true"
               />
 
-              {/* Header */}
-              <div className="mb-3">
-                <h3 className="font-display font-semibold text-[18px] text-[--text] tracking-[-0.3px]">
-                  {exp.role}
-                </h3>
-                <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
-                  <span className="font-mono text-[13px] text-[--accent]">{exp.company}</span>
-                  <span className="text-[--border]" aria-hidden="true">·</span>
-                  <span className="text-[13px] text-[--muted]">{exp.location}</span>
-                  <span className="text-[--border]" aria-hidden="true">·</span>
-                  <time className="font-mono text-[12px] text-[--muted]">
-                    {formatDate(exp.startDate)} — {exp.endDate === 'Present' ? 'Present' : formatDate(exp.endDate)}
-                  </time>
+              {/* Header — flex row with optional logo */}
+              <div className="mb-3 flex gap-3 items-start">
+                {exp.logo ? (
+                  /* eslint-disable-next-line @next/next/no-img-element */
+                  <img
+                    src={exp.logo}
+                    alt={`${exp.company} logo`}
+                    width={40}
+                    height={40}
+                    className="w-10 h-10 shrink-0 rounded-[8px] border border-[--border] object-contain bg-white/5 mt-0.5"
+                  />
+                ) : (
+                  <div
+                    className="w-10 h-10 shrink-0 rounded-[8px] border border-[--border] bg-[--accent-dim] flex items-center justify-center text-[--accent] mt-0.5"
+                    aria-hidden="true"
+                  >
+                    <Building2 size={18} />
+                  </div>
+                )}
+                <div>
+                  <h3 className="font-display font-semibold text-[18px] text-[--text] tracking-[-0.3px]">
+                    {exp.role}
+                  </h3>
+                  <div className="flex flex-wrap items-center gap-x-3 gap-y-1 mt-1">
+                    <span className="font-mono text-[13px] text-[--accent]">{exp.company}</span>
+                    <span className="text-[--border]" aria-hidden="true">·</span>
+                    <span className="text-[13px] text-[--muted]">{exp.location}</span>
+                    <span className="text-[--border]" aria-hidden="true">·</span>
+                    <time className="font-mono text-[12px] text-[--muted]">
+                      {formatDate(exp.startDate)} — {exp.endDate ? formatDate(exp.endDate) : 'Present'}
+                    </time>
+                  </div>
                 </div>
               </div>
 

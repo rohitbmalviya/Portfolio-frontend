@@ -7,16 +7,16 @@ import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
+import { ScreenshotLightbox, LightboxTrigger } from '@/components/projects/screenshot-lightbox';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import rehypeHighlight from 'rehype-highlight';
-import { ExternalLink, ArrowLeft, Lock } from 'lucide-react';
+import { ExternalLink, ArrowLeft } from 'lucide-react';
 import { getProject, getProjects } from '@/lib/api';
 import { FALLBACK_PROJECTS } from '@/lib/fallback-data';
-import { Tag, Pill } from '@/components/ui/tag';
+import { Tag } from '@/components/ui/tag';
 import { LinkButton } from '@/components/ui/button';
-import { proofLabel } from '@/lib/utils';
 
 export const revalidate = 60;
 
@@ -58,12 +58,11 @@ export default async function ProjectDetailPage({ params }: Props) {
 
   if (!project) notFound();
 
-  const label = proofLabel(project.proofType);
-  const isArch = project.proofType === 'ARCHITECTURE';
   const hasScreenshot = project.screenshots && project.screenshots.length > 0;
 
   return (
     <div className="py-12">
+      <ScreenshotLightbox screenshots={project.screenshots}>
       <div className="wrap">
         {/* Back */}
         <Link
@@ -78,8 +77,6 @@ export default async function ProjectDetailPage({ params }: Props) {
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-10 mb-14 items-start">
           {/* Left: meta */}
           <div>
-            {label && <Pill className="mb-4">{label}</Pill>}
-
             <h1 className="font-display font-bold text-[clamp(28px,4vw,44px)] leading-[1.1] tracking-[-1px] text-[--text] mb-3">
               {project.title}
             </h1>
@@ -104,7 +101,7 @@ export default async function ProjectDetailPage({ params }: Props) {
 
             {/* CTA */}
             <div className="flex flex-wrap gap-3">
-              {project.liveUrl && !isArch && (
+              {project.liveUrl && (
                 <LinkButton
                   href={project.liveUrl}
                   target="_blank"
@@ -113,49 +110,41 @@ export default async function ProjectDetailPage({ params }: Props) {
                   aria-label={`${project.title} — live demo (opens in new tab)`}
                 >
                   <ExternalLink size={14} aria-hidden="true" />
-                  {label === 'live demo' ? 'Live demo' : 'Visit project'}
+                  Live demo
                 </LinkButton>
-              )}
-              {isArch && (
-                <div className="flex items-center gap-2 font-mono text-[13px] text-[--muted]">
-                  <Lock size={14} aria-hidden="true" />
-                  On-prem / NDA — no public URL
-                </div>
               )}
             </div>
           </div>
 
-          {/* Right: screenshot / arch diagram */}
+          {/* Right: hero screenshot */}
           <div
             className={[
               'rounded-[16px] overflow-hidden border border-[--border]',
               'aspect-video relative',
-              !hasScreenshot && !project.architectureImg
+              !hasScreenshot
                 ? 'bg-gradient-to-br from-[--thumb-from] to-[--thumb-to] flex items-center justify-center'
                 : '',
             ].join(' ')}
           >
             {hasScreenshot ? (
-              <Image
-                src={project.screenshots[0].url}
-                alt={project.screenshots[0].alt || project.title}
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-cover"
-                priority
-              />
-            ) : project.architectureImg ? (
-              <Image
-                src={project.architectureImg}
-                alt={`${project.title} architecture diagram`}
-                fill
-                sizes="(max-width: 1024px) 100vw, 50vw"
-                className="object-contain p-4"
-                priority
-              />
+              <>
+                <Image
+                  src={project.screenshots[0].url}
+                  alt={project.screenshots[0].alt || project.title}
+                  fill
+                  sizes="(max-width: 1024px) 100vw, 50vw"
+                  className="object-cover"
+                  priority
+                />
+                <LightboxTrigger
+                  index={0}
+                  ariaLabel="View screenshot full size"
+                  className="absolute inset-0 z-10 cursor-zoom-in transition-colors hover:bg-black/10"
+                />
+              </>
             ) : (
               <span className="font-mono text-[12px] text-[--muted] select-none">
-                {isArch ? '[ architecture diagram ]' : '[ screenshot ]'}
+                [ screenshot ]
               </span>
             )}
           </div>
@@ -187,33 +176,6 @@ export default async function ProjectDetailPage({ params }: Props) {
               <p className="text-[--muted] text-[16px] leading-[1.75]">{project.contribution}</p>
             </section>
 
-            {/* Architecture */}
-            {(project.architectureImg || isArch) && (
-              <section aria-labelledby="arch-heading">
-                <h2
-                  id="arch-heading"
-                  className="font-display font-semibold text-[20px] text-[--text] mb-4 pb-3 border-b border-[--border] tracking-[-0.3px]"
-                >
-                  Architecture
-                </h2>
-                {project.architectureImg ? (
-                  <div className="rounded-[12px] border border-[--border] overflow-hidden">
-                    <Image
-                      src={project.architectureImg}
-                      alt={`${project.title} architecture diagram`}
-                      width={900}
-                      height={500}
-                      className="w-full h-auto"
-                    />
-                  </div>
-                ) : (
-                  <div className="rounded-[12px] border border-[--border] bg-gradient-to-br from-[--thumb-from] to-[--thumb-to] h-[200px] flex items-center justify-center font-mono text-[13px] text-[--muted]">
-                    [ architecture diagram — coming soon ]
-                  </div>
-                )}
-              </section>
-            )}
-
             {/* Full body (MDX/markdown) */}
             {project.body && project.body.trim() !== '' && (
               <section aria-label="Project deep dive">
@@ -228,20 +190,6 @@ export default async function ProjectDetailPage({ params }: Props) {
               </section>
             )}
 
-            {/* NDA note for SCB */}
-            {isArch && (
-              <aside
-                className="flex items-start gap-3 bg-[--surface] border border-[--border] rounded-[12px] p-4"
-                aria-label="NDA notice"
-              >
-                <Lock size={16} className="text-[--muted] mt-[2px] shrink-0" aria-hidden="true" />
-                <p className="text-[--muted] text-[14px] leading-relaxed">
-                  <strong className="text-[--text]">NDA / Bank system.</strong> This is an
-                  on-premises bank deployment (VPN-only). No public URL, no screenshots by design.
-                  Architecture and role scope are shown above.
-                </p>
-              </aside>
-            )}
           </div>
 
           {/* Sidebar: tech stack + key metrics */}
@@ -286,6 +234,11 @@ export default async function ProjectDetailPage({ params }: Props) {
                         sizes="280px"
                         className="object-cover"
                       />
+                      <LightboxTrigger
+                        index={i + 1}
+                        ariaLabel={`View screenshot ${i + 2} full size`}
+                        className="absolute inset-0 z-10 cursor-zoom-in transition-colors hover:bg-black/10"
+                      />
                     </div>
                   ))}
                 </div>
@@ -294,6 +247,7 @@ export default async function ProjectDetailPage({ params }: Props) {
           </aside>
         </div>
       </div>
+      </ScreenshotLightbox>
     </div>
   );
 }

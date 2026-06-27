@@ -15,9 +15,11 @@ import {
   Rss,
   Wrench,
   Briefcase,
+  GraduationCap,
   Trophy,
   Image,
   Settings,
+  SlidersHorizontal,
   LogOut,
   ChevronLeft,
   ChevronRight,
@@ -34,8 +36,10 @@ const NAV_ITEMS = [
   { href: '/admin/blog', icon: Rss, label: 'Blog' },
   { href: '/admin/skills', icon: Wrench, label: 'Skills' },
   { href: '/admin/experience', icon: Briefcase, label: 'Experience' },
+  { href: '/admin/education', icon: GraduationCap, label: 'Education' },
   { href: '/admin/achievements', icon: Trophy, label: 'Achievements' },
   { href: '/admin/media', icon: Image, label: 'Media' },
+  { href: '/admin/config', icon: SlidersHorizontal, label: 'Configuration' },
   { href: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
 

@@ -1,5 +1,5 @@
 // ============================================================
-//  /projects — All projects grid.
+//  /projects — all projects in a single unified grid.
 //  ISR: revalidate every 60s.
 // ============================================================
 
@@ -7,7 +7,6 @@ import type { Metadata } from 'next';
 import { getProjects } from '@/lib/api';
 import { FALLBACK_PROJECTS } from '@/lib/fallback-data';
 import { ProjectCard } from '@/components/sections/project-card';
-import { SectionHeading } from '@/components/ui/section-heading';
 
 export const revalidate = 60;
 
@@ -24,9 +23,6 @@ export const metadata: Metadata = {
 export default async function ProjectsPage() {
   let projects = await getProjects();
   if (projects.length === 0) projects = FALLBACK_PROJECTS;
-
-  const featured = projects.filter((p) => p.featured);
-  const rest = projects.filter((p) => !p.featured);
 
   return (
     <div className="py-16">
@@ -45,31 +41,14 @@ export default async function ProjectsPage() {
           </p>
         </div>
 
-        {/* Featured */}
-        {featured.length > 0 && (
-          <div className="mb-12">
-            <SectionHeading title="Featured" number="01" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-[22px]">
-              {featured.map((project) => (
-                <ProjectCard key={project.id} project={project} />
-              ))}
-            </div>
+        {/* All projects — one unified grid (ordered best-first) */}
+        {projects.length > 0 ? (
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-[22px]">
+            {projects.map((project) => (
+              <ProjectCard key={project.id} project={project} />
+            ))}
           </div>
-        )}
-
-        {/* Rest */}
-        {rest.length > 0 && (
-          <div>
-            <SectionHeading title="All Projects" number="02" />
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-[22px]">
-              {rest.map((project) => (
-                <ProjectCard key={project.id} project={project} />
-              ))}
-            </div>
-          </div>
-        )}
-
-        {projects.length === 0 && (
+        ) : (
           <p className="text-[--muted] text-center py-24">No projects found.</p>
         )}
       </div>

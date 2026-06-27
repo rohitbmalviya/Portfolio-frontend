@@ -276,6 +276,92 @@ code {
 :root[data-theme="light"] .hljs-variable,
 :root[data-theme="light"] .hljs-params { color: #854D0E; }
 
+/* ── REACT-DAY-PICKER THEME (.dp-popover wrapper) ──────────── */
+/*
+   We scope all overrides under .dp-popover so these rules never
+   bleed into any other RDP calendar that might appear elsewhere.
+   The CSS-variable tokens are already set via the inline `style`
+   prop on <DayPicker>; these rules handle pseudo-states that
+   require selectors (hover, focus-visible) and the filled
+   selected-day background that RDP v10 doesn't expose as a var.
+*/
+
+/* Caption month/year label */
+.dp-popover .rdp-caption_label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* Weekday header row (Mon, Tue…) */
+.dp-popover .rdp-weekday {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+/* Regular day buttons */
+.dp-popover .rdp-day_button {
+  transition: background-color 120ms, border-color 120ms, color 120ms;
+}
+
+/* Hover state on non-disabled days */
+.dp-popover .rdp-day_button:hover:not(:disabled) {
+  background-color: var(--surface-2);
+  border-color: var(--border) !important;
+}
+
+/* Today — outline ring using accent colour */
+.dp-popover .rdp-today:not(.rdp-outside) .rdp-day_button {
+  border-color: var(--accent) !important;
+  color: var(--accent);
+  font-weight: 600;
+}
+
+/* Selected day — filled accent background */
+.dp-popover .rdp-selected .rdp-day_button {
+  background-color: var(--accent) !important;
+  border-color: var(--accent) !important;
+  color: var(--surface) !important;
+  font-weight: 600;
+}
+
+/* Today AND selected — keep filled accent */
+.dp-popover .rdp-today.rdp-selected .rdp-day_button {
+  background-color: var(--accent) !important;
+  color: var(--surface) !important;
+}
+
+/* Prev / Next navigation buttons */
+.dp-popover .rdp-button_previous,
+.dp-popover .rdp-button_next {
+  background: var(--surface-2);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  color: var(--muted);
+  cursor: pointer;
+  transition: color 120ms, border-color 120ms;
+}
+
+.dp-popover .rdp-button_previous:hover:not(:disabled),
+.dp-popover .rdp-button_next:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--muted);
+}
+
+.dp-popover .rdp-button_previous:disabled,
+.dp-popover .rdp-button_next:disabled {
+  opacity: 0.3;
+  cursor: not-allowed;
+}
+
+/* Chevron SVG inside nav buttons */
+.dp-popover .rdp-chevron {
+  fill: currentColor;
+}
+
 /* ── ANIMATION UTILITIES ───────────────────────────────────── */
 
 @keyframes fadeInUp {

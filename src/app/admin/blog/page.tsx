@@ -6,7 +6,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { Plus, Rss, Globe } from 'lucide-react';
+import { Globe, Pencil, Plus, Rss, Trash2 } from 'lucide-react';
 import { adminBlog } from '@/lib/admin-api';
 import type { BlogPost } from '@/lib/types';
 import { AdminShell } from '@/components/admin/admin-shell';
@@ -114,14 +114,16 @@ function BlogContent() {
                   {post.published ? 'Unpublish' : 'Publish'}
                 </AdminButton>
                 <Link href={`/admin/blog/${post.id}`}>
-                  <AdminButton variant="ghost" size="sm" type="button">Edit</AdminButton>
+                  <AdminButton variant="ghost" size="sm" type="button">
+                    <Pencil size={13} aria-hidden="true" /> Edit
+                  </AdminButton>
                 </Link>
                 <AdminButton
                   variant="danger"
                   size="sm"
                   onClick={() => setDeleteTarget(post)}
                 >
-                  Delete
+                  <Trash2 size={13} aria-hidden="true" /> Delete
                 </AdminButton>
               </div>
             </AdminCard>

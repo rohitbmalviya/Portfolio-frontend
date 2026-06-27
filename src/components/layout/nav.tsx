@@ -3,7 +3,11 @@
 // ============================================================
 //  Nav — sticky, backdrop-blur, 64px, mono logo, nav links
 //  with section numbers, theme toggle. Mobile: hamburger menu.
-//  Matches sample-a-refined-dark.html exactly.
+//
+//  Links come from GET /api/pages/nav (fetched server-side in
+//  the public layout and passed as `navItems`). Falls back to
+//  FALLBACK_NAV when the API is unreachable so the site still
+//  renders correctly.
 // ============================================================
 
 import { useState } from 'react';
@@ -11,16 +15,48 @@ import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
+import type { NavPage } from '@/lib/types';
 
-const NAV_LINKS = [
-  { num: '01', label: 'about', href: '/#about' },
-  { num: '02', label: 'work', href: '/#work' },
-  { num: '03', label: 'blog', href: '/blog' },
-  { num: '04', label: 'contact', href: '/#contact' },
+// ── Static fallback ───────────────────────────────────────────
+// Used when `navItems` prop is empty/undefined (API unreachable).
+
+const FALLBACK_NAV: NavPage[] = [
+  { slug: 'home',     title: 'Home',    navLabel: 'home',    navOrder: 0 },
+  { slug: 'projects', title: 'Work',    navLabel: 'work',    navOrder: 1 },
+  { slug: 'blog',     title: 'Blog',    navLabel: 'blog',    navOrder: 2 },
+  { slug: 'contact',  title: 'Contact', navLabel: 'contact', navOrder: 3 },
 ];
 
-export function Nav() {
+// ── Helpers ───────────────────────────────────────────────────
+
+interface NavLink {
+  num: string;
+  label: string;
+  href: string;
+}
+
+function toNavLinks(pages: NavPage[]): NavLink[] {
+  return pages.map((p, i) => ({
+    num: String(i + 1).padStart(2, '0'),
+    // Render navLabel if set, otherwise fall back to title; lowercase for style consistency
+    label: (p.navLabel ?? p.title).toLowerCase(),
+    href: p.slug === 'home' ? '/' : `/${p.slug}`,
+  }));
+}
+
+// ── Component ─────────────────────────────────────────────────
+
+interface NavProps {
+  /** Pre-fetched nav pages from the server layout (GET /api/pages/nav). */
+  navItems?: NavPage[];
+}
+
+export function Nav({ navItems }: NavProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
+
+  // Use API-driven items if non-empty, otherwise fall back to static set
+  const effectiveItems = navItems && navItems.length > 0 ? navItems : FALLBACK_NAV;
+  const NAV_LINKS = toNavLinks(effectiveItems);
 
   return (
     <nav

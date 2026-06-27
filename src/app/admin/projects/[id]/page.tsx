@@ -11,7 +11,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { adminProjects } from '@/lib/admin-api';
-import type { Project, ProofType } from '@/lib/types';
+import type { Project } from '@/lib/types';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
 import {
@@ -24,7 +24,7 @@ import {
   TagsInput,
   LoadingRows,
 } from '@/components/admin/ui';
-import { MultiImageUpload, ImageUpload } from '@/components/admin/image-upload';
+import { MultiImageUpload } from '@/components/admin/image-upload';
 
 type FormState = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -36,10 +36,8 @@ const EMPTY_FORM: FormState = {
   tags: [],
   stack: [],
   metric: '',
-  proofType: 'NONE',
   liveUrl: '',
   screenshots: [],
-  architectureImg: '',
   overview: '',
   contribution: '',
   body: '',
@@ -47,13 +45,6 @@ const EMPTY_FORM: FormState = {
   order: 0,
   published: false,
 };
-
-const PROOF_TYPE_OPTIONS: { value: ProofType; label: string }[] = [
-  { value: 'NONE', label: 'None' },
-  { value: 'LIVE_DEMO', label: 'Live Demo' },
-  { value: 'LIVE_LOGIN', label: 'Live (Login)' },
-  { value: 'ARCHITECTURE', label: 'Architecture Diagram' },
-];
 
 function ProjectFormContent({ projectId }: { projectId: string | null }) {
   const router = useRouter();
@@ -77,10 +68,8 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
           tags: p.tags ?? [],
           stack: p.stack ?? [],
           metric: p.metric,
-          proofType: p.proofType,
           liveUrl: p.liveUrl ?? '',
           screenshots: (p.screenshots ?? []) as Project['screenshots'],
-          architectureImg: p.architectureImg ?? '',
           overview: p.overview,
           contribution: p.contribution,
           body: p.body,
@@ -92,6 +81,18 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
       .catch((err) => toastError(err instanceof Error ? err.message : 'Failed to load project.'))
       .finally(() => setLoading(false));
   }, [projectId, toastError]);
+
+  // Prefill `order` for a brand-new project to the next free slot (max + 1)
+  useEffect(() => {
+    if (projectId) return;
+    adminProjects
+      .list()
+      .then((ps) => {
+        const maxOrder = ps.length > 0 ? Math.max(...ps.map((p) => p.order)) : -1;
+        setForm((f) => ({ ...f, order: maxOrder + 1 }));
+      })
+      .catch(() => {});
+  }, [projectId]);
 
   function set<K extends keyof FormState>(key: K, val: FormState[K]) {
     setForm((f) => ({ ...f, [key]: val }));
@@ -108,7 +109,6 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
       const payload = {
         ...form,
         liveUrl: form.liveUrl || undefined,
-        architectureImg: form.architectureImg || undefined,
       };
       if (isNew) {
         const created = await adminProjects.create(payload);
@@ -152,7 +152,7 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
         All projects
       </Link>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5 max-w-[760px]" noValidate>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5 w-full" noValidate>
         {/* Basic info */}
         <AdminCard>
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
@@ -214,26 +214,18 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
           </div>
         </AdminCard>
 
-        {/* Proof & Links */}
+        {/* Links */}
         <AdminCard>
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
-            Proof & Links
+            Links
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <AdminSelect
-              label="Proof type"
-              value={form.proofType}
-              onChange={(e) => set('proofType', e.target.value as ProofType)}
-              options={PROOF_TYPE_OPTIONS}
-            />
-            <AdminInput
-              label="Live URL"
-              type="url"
-              value={form.liveUrl ?? ''}
-              onChange={(e) => set('liveUrl', e.target.value)}
-              placeholder="https://…"
-            />
-          </div>
+          <AdminInput
+            label="Live URL"
+            type="url"
+            value={form.liveUrl ?? ''}
+            onChange={(e) => set('liveUrl', e.target.value)}
+            placeholder="https://…"
+          />
         </AdminCard>
 
         {/* Media */}
@@ -241,19 +233,11 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
             Media
           </h2>
-          <div className="flex flex-col gap-5">
-            <MultiImageUpload
-              label="Screenshots"
-              value={form.screenshots as Array<{ url: string; alt: string }>}
-              onChange={(items) => set('screenshots', items)}
-            />
-            <ImageUpload
-              label="Architecture diagram"
-              value={form.architectureImg ?? null}
-              onChange={(url) => set('architectureImg', url ?? '')}
-              hint="For NDA projects without a live URL"
-            />
-          </div>
+          <MultiImageUpload
+            label="Screenshots"
+            value={form.screenshots as Array<{ url: string; alt: string }>}
+            onChange={(items) => set('screenshots', items)}
+          />
         </AdminCard>
 
         {/* Content */}

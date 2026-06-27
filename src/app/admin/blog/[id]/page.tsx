@@ -123,7 +123,7 @@ function BlogFormContent({ postId }: { postId: string | null }) {
         All posts
       </Link>
 
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5 max-w-[760px]" noValidate>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5 w-full" noValidate>
         <AdminCard>
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
             Post Details
@@ -152,18 +152,19 @@ function BlogFormContent({ postId }: { postId: string | null }) {
               }
               min={1}
             />
-            <AdminTextarea
-              label="Excerpt"
-              value={form.excerpt}
-              onChange={(e) => set('excerpt', e.target.value)}
-              rows={3}
-              className="sm:col-span-2"
-            />
-            <div className="sm:col-span-2">
+            <div>
               <TagsInput
                 label="Tags"
                 value={form.tags}
                 onChange={(tags) => set('tags', tags)}
+              />
+            </div>
+            <div className="sm:col-span-2">
+              <AdminTextarea
+                label="Excerpt"
+                value={form.excerpt}
+                onChange={(e) => set('excerpt', e.target.value)}
+                rows={3}
               />
             </div>
           </div>

@@ -4,10 +4,12 @@
 //  Admin Site Settings — singleton PATCH
 // ============================================================
 
-import { useEffect, useState } from 'react';
-import { Save, Loader2 } from 'lucide-react';
-import { adminSettings } from '@/lib/admin-api';
-import type { SiteSettings, SocialLinks, DefaultTheme } from '@/lib/types';
+import { useEffect, useRef, useState } from 'react';
+import { Save, Loader2, Plus, Trash2, Upload, Download, ExternalLink } from 'lucide-react';
+import { adminSettings, adminMedia } from '@/lib/admin-api';
+import type { SiteSettings, SocialLink, DefaultTheme } from '@/lib/types';
+import { getConfigOptions } from '@/lib/api';
+import type { ConfigOption } from '@/lib/api';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
 import {
@@ -20,12 +22,25 @@ import {
 
 type FormState = Omit<SiteSettings, 'id' | 'createdAt' | 'updatedAt'>;
 
+const SOCIAL_TYPE_OPTIONS: ConfigOption[] = [
+  { value: 'website', label: 'Website' },
+  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'github', label: 'GitHub' },
+  { value: 'twitter', label: 'X (Twitter)' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'dribbble', label: 'Dribbble' },
+  { value: 'telegram', label: 'Telegram' },
+  { value: 'email', label: 'Email' },
+];
+
 const EMPTY: FormState = {
   name: '',
   tagline: '',
   email: '',
   location: '',
-  socials: {},
+  socials: [],
   resumeUrl: '',
   defaultTheme: 'DARK',
   brandAccent: '',
@@ -34,11 +49,46 @@ const EMPTY: FormState = {
   ogDescription: '',
 };
 
+// Backward-compat: older settings stored socials as a map { github, linkedin, … }.
+// Convert any non-array shape to the new { type, value }[] list.
+function normalizeSocials(raw: unknown): SocialLink[] {
+  if (Array.isArray(raw)) return raw as SocialLink[];
+  if (raw && typeof raw === 'object') {
+    return Object.entries(raw as Record<string, string>)
+      .filter(([, v]) => Boolean(v))
+      .map(([type, value]) => ({ type, value }));
+  }
+  return [];
+}
+
 function SettingsContent() {
   const { success, error: toastError } = useToast();
   const [form, setForm] = useState<FormState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [uploadingResume, setUploadingResume] = useState(false);
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+  const [socialTypeOptions, setSocialTypeOptions] = useState<ConfigOption[]>(SOCIAL_TYPE_OPTIONS);
+
+  // Load social link types from config API; fall back to the hardcoded constant if empty.
+  useEffect(() => {
+    getConfigOptions('social_link_types').then((opts) => {
+      if (opts.length > 0) setSocialTypeOptions(opts);
+    });
+  }, []);
+
+  async function uploadResume(file: File) {
+    setUploadingResume(true);
+    try {
+      const media = await adminMedia.upload(file, file.name);
+      setForm((f) => ({ ...f, resumeUrl: media.cloudinaryUrl }));
+      success('Résumé uploaded.');
+    } catch (err) {
+      toastError(err instanceof Error ? err.message : 'Résumé upload failed.');
+    } finally {
+      setUploadingResume(false);
+    }
+  }
 
   useEffect(() => {
     setLoading(true);
@@ -50,7 +100,7 @@ function SettingsContent() {
           tagline: s.tagline,
           email: s.email,
           location: s.location,
-          socials: s.socials ?? {},
+          socials: normalizeSocials(s.socials),
           resumeUrl: s.resumeUrl ?? '',
           defaultTheme: s.defaultTheme,
           brandAccent: s.brandAccent ?? '',
@@ -67,10 +117,26 @@ function SettingsContent() {
     setForm((f) => ({ ...f, [key]: val }));
   }
 
-  function setSocial(key: string, val: string) {
+  function setSocialRow(index: number, patch: Partial<SocialLink>) {
+    setForm((f) => {
+      const next = (f.socials as SocialLink[]).map((row, i) =>
+        i === index ? { ...row, ...patch } : row,
+      );
+      return { ...f, socials: next };
+    });
+  }
+
+  function addSocialRow() {
     setForm((f) => ({
       ...f,
-      socials: { ...((f.socials as SocialLinks) ?? {}), [key]: val },
+      socials: [...(f.socials as SocialLink[]), { type: 'website', value: '' }],
+    }));
+  }
+
+  function removeSocialRow(index: number) {
+    setForm((f) => ({
+      ...f,
+      socials: (f.socials as SocialLink[]).filter((_, i) => i !== index),
     }));
   }
 
@@ -104,7 +170,7 @@ function SettingsContent() {
     );
   }
 
-  const socials = (form.socials as SocialLinks) ?? {};
+  const socials = form.socials as SocialLink[];
 
   return (
     <AdminShell
@@ -117,7 +183,7 @@ function SettingsContent() {
         </AdminButton>
       }
     >
-      <form onSubmit={handleSubmit} className="flex flex-col gap-5 max-w-[640px]" noValidate>
+      <form onSubmit={handleSubmit} className="flex flex-col gap-5 w-full" noValidate>
         {/* Identity */}
         <AdminCard>
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
@@ -149,13 +215,75 @@ function SettingsContent() {
               value={form.email}
               onChange={(e) => set('email', e.target.value)}
             />
-            <AdminInput
-              label="Resume URL"
-              type="url"
-              value={form.resumeUrl ?? ''}
-              onChange={(e) => set('resumeUrl', e.target.value)}
-              placeholder="https://…"
-            />
+            {/* Résumé — upload to Cloudinary, with preview + download */}
+            <div>
+              <label className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>
+                Résumé (PDF)
+              </label>
+              <input
+                ref={resumeInputRef}
+                type="file"
+                accept="application/pdf,.pdf"
+                className="sr-only"
+                onChange={(e) => e.target.files?.[0] && uploadResume(e.target.files[0])}
+              />
+
+              {form.resumeUrl ? (
+                <div
+                  className="mt-1.5 rounded-[10px] border overflow-hidden"
+                  style={{ borderColor: 'var(--border)' }}
+                >
+                  <iframe
+                    src={form.resumeUrl}
+                    title="Résumé preview"
+                    className="w-full h-64 bg-white"
+                  />
+                  <div
+                    className="flex flex-wrap items-center gap-2 p-2 border-t"
+                    style={{ borderColor: 'var(--border)' }}
+                  >
+                    <a href={form.resumeUrl} target="_blank" rel="noopener noreferrer">
+                      <AdminButton variant="ghost" size="sm" type="button">
+                        <ExternalLink size={13} aria-hidden="true" /> View
+                      </AdminButton>
+                    </a>
+                    <a href={form.resumeUrl} download>
+                      <AdminButton variant="ghost" size="sm" type="button">
+                        <Download size={13} aria-hidden="true" /> Download
+                      </AdminButton>
+                    </a>
+                    <AdminButton
+                      variant="ghost"
+                      size="sm"
+                      type="button"
+                      loading={uploadingResume}
+                      onClick={() => resumeInputRef.current?.click()}
+                    >
+                      <Upload size={13} aria-hidden="true" /> Replace
+                    </AdminButton>
+                    <AdminButton
+                      variant="danger"
+                      size="sm"
+                      type="button"
+                      onClick={() => set('resumeUrl', '')}
+                    >
+                      <Trash2 size={13} aria-hidden="true" /> Remove
+                    </AdminButton>
+                  </div>
+                </div>
+              ) : (
+                <div className="mt-1.5">
+                  <AdminButton
+                    variant="ghost"
+                    type="button"
+                    loading={uploadingResume}
+                    onClick={() => resumeInputRef.current?.click()}
+                  >
+                    <Upload size={14} aria-hidden="true" /> Upload résumé (PDF)
+                  </AdminButton>
+                </div>
+              )}
+            </div>
           </div>
         </AdminCard>
 
@@ -164,25 +292,43 @@ function SettingsContent() {
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
             Social Links
           </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <AdminInput
-              label="GitHub"
-              value={socials.github ?? ''}
-              onChange={(e) => setSocial('github', e.target.value)}
-              placeholder="https://github.com/username"
-            />
-            <AdminInput
-              label="LinkedIn"
-              value={socials.linkedin ?? ''}
-              onChange={(e) => setSocial('linkedin', e.target.value)}
-              placeholder="https://linkedin.com/in/username"
-            />
-            <AdminInput
-              label="Twitter / X"
-              value={socials.twitter ?? ''}
-              onChange={(e) => setSocial('twitter', e.target.value)}
-              placeholder="https://twitter.com/username"
-            />
+          <div className="flex flex-col gap-2">
+            {socials.map((row, i) => (
+              <div key={i} className="flex gap-2 items-center">
+                <div className="flex-1">
+                  <AdminSelect
+                    value={row.type}
+                    onChange={(e) => setSocialRow(i, { type: e.target.value })}
+                    options={socialTypeOptions}
+                  />
+                </div>
+                <div className="flex-1">
+                  <AdminInput
+                    type={row.type === 'email' ? 'email' : 'url'}
+                    placeholder="https://…"
+                    value={row.value}
+                    onChange={(e) => setSocialRow(i, { value: e.target.value })}
+                  />
+                </div>
+                <AdminButton
+                  variant="danger"
+                  size="sm"
+                  type="button"
+                  aria-label="Remove social link"
+                  onClick={() => removeSocialRow(i)}
+                >
+                  <Trash2 size={13} aria-hidden="true" /> Remove
+                </AdminButton>
+              </div>
+            ))}
+            <AdminButton
+              variant="ghost"
+              size="sm"
+              type="button"
+              onClick={addSocialRow}
+            >
+              <Plus size={14} aria-hidden="true" /> Add link
+            </AdminButton>
           </div>
         </AdminCard>
 

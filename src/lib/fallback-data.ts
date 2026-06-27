@@ -13,10 +13,10 @@ export const FALLBACK_SETTINGS: SiteSettings = {
   tagline: 'Full-Stack Engineer',
   email: 'rohitbmalviya@gmail.com',
   location: 'Pune, India',
-  socials: {
-    github: 'https://github.com/rohithumancloud',
-    linkedin: 'https://linkedin.com/in/rohitbmalviya',
-  },
+  socials: [
+    { type: 'github', value: 'https://github.com/rohithumancloud' },
+    { type: 'linkedin', value: 'https://linkedin.com/in/rohitbmalviya' },
+  ],
   resumeUrl: '/resume.pdf',
   defaultTheme: 'DARK',
   footerText: 'Designed & built by Rohit Malviya — Next.js + Tailwind',
@@ -37,10 +37,8 @@ export const FALLBACK_PROJECTS: Project[] = [
     tags: ['Python', 'TensorFlow', 'FastAPI', 'ARQ', 'Oracle', 'Kubernetes', 'Helm'],
     stack: ['Python', 'TensorFlow', 'FastAPI', 'ARQ', 'Oracle', 'Kubernetes', 'Helm'],
     metric: '3 services · ~1,242 tests · Cholesky-GBM engine',
-    proofType: 'ARCHITECTURE',
     liveUrl: null,
     screenshots: [],
-    architectureImg: null,
     overview:
       'A production Monte Carlo platform that ingests the bank\'s fund/price/FX data over SFTP, syncs it to Oracle, and runs TensorFlow GBM simulations with Cholesky-correlated multi-asset paths.',
     contribution:
@@ -61,10 +59,8 @@ export const FALLBACK_PROJECTS: Project[] = [
     tags: ['Express', 'Prisma', 'PostgreSQL', 'Next.js', 'LiveKit', 'Convex', 'Vertex AI'],
     stack: ['Express', 'Prisma', 'PostgreSQL', 'Next.js', 'LiveKit', 'Convex', 'GCP'],
     metric: '148 Prisma models · ~185-endpoint backend',
-    proofType: 'LIVE_DEMO',
     liveUrl: null,
     screenshots: [],
-    architectureImg: null,
     overview:
       'Full hiring-lifecycle platform — job posting → AI candidate matching → 3-stage AI assessment funnel → AI-proctored LiveKit interviews → hire.',
     contribution:
@@ -85,10 +81,8 @@ export const FALLBACK_PROJECTS: Project[] = [
     tags: ['Playwright', 'BullMQ', 'Gemini', 'GCS', 'Stripe', 'Express', 'Prisma'],
     stack: ['Playwright', 'BullMQ', 'Gemini', 'GCS', 'Stripe', 'Express', 'Prisma'],
     metric: '3 Playwright adapters · 41 billing routes',
-    proofType: 'LIVE_DEMO',
     liveUrl: null,
     screenshots: [],
-    architectureImg: null,
     overview:
       'A headless bot silently joins Teams/Zoom/Meet, captures audio to GCS, and produces diarized transcripts → summaries, MOM emails & CRM sync.',
     contribution:
@@ -109,10 +103,8 @@ export const FALLBACK_PROJECTS: Project[] = [
     tags: ['Express', 'TypeORM', 'PostgreSQL', 'FastAPI', 'LangGraph', 'Elasticsearch'],
     stack: ['Express', 'TypeORM', 'PostgreSQL', 'FastAPI', 'LangGraph', 'Elasticsearch', 'Next.js'],
     metric: '7 services · 63 shared entities · 14-page admin + 8-page operator',
-    proofType: 'LIVE_DEMO',
     liveUrl: null,
     screenshots: [],
-    architectureImg: null,
     overview:
       'Multi-sided property platform (landlords, agencies, agents, operators) with credit/subscription billing, Elasticsearch search, and a conversational AI assistant.',
     contribution:
@@ -133,10 +125,8 @@ export const FALLBACK_PROJECTS: Project[] = [
     tags: ['Express', 'Prisma', 'PostgreSQL', 'Next.js', 'pdfmake', 'AWS S3'],
     stack: ['Express', 'Prisma', 'PostgreSQL', 'Next.js', 'pdfmake', 'AWS S3'],
     metric: '34-route partner ecosystem · 4 role portals · credit facility',
-    proofType: 'LIVE_DEMO',
     liveUrl: null,
     screenshots: [],
-    architectureImg: null,
     overview:
       'B2B2C insurance distribution: insurers define products, partners onboard on a credit facility, issuer agents instantly issue policies with PDF certificate + QR verification.',
     contribution:
@@ -157,10 +147,8 @@ export const FALLBACK_PROJECTS: Project[] = [
     tags: ['Angular 19', 'Signals', 'RxJS', 'TypeScript', 'Spring Boot', 'Java 21'],
     stack: ['Angular 19', 'Signals', 'RxJS', 'TypeScript', 'Spring Boot', 'Java 21'],
     metric: '~69 lazy routes · ~1,845 signal usages · MiFID II suitability',
-    proofType: 'NONE',
     liveUrl: null,
     screenshots: [],
-    architectureImg: null,
     overview:
       'Wealth-advisory platform — clients set goals, complete MiFID II risk-profiling & suitability, get matched to model portfolios, review advisor proposals & execute orders.',
     contribution:
@@ -181,10 +169,8 @@ export const FALLBACK_PROJECTS: Project[] = [
     tags: ['Go', 'Gin', 'GORM', 'Angular 18', 'PostgreSQL', 'Docker'],
     stack: ['Go', 'Gin', 'GORM', 'Angular 18', 'PostgreSQL', 'Docker'],
     metric: '24 Go REST APIs · 27 Angular components · goroutine batch',
-    proofType: 'NONE',
     liveUrl: null,
     screenshots: [],
-    architectureImg: null,
     overview:
       'Ingests raw biometric punch files and reconstructs attendance via a custom punch-pairing algorithm; muster-roll + daily/monthly reports with Excel export.',
     contribution:
@@ -205,10 +191,8 @@ export const FALLBACK_PROJECTS: Project[] = [
     tags: ['Next.js', 'Express', 'TypeORM', 'PostgreSQL', 'AWS S3', 'Jenkins'],
     stack: ['Next.js', 'Express', 'TypeORM', 'PostgreSQL', 'AWS S3', 'Jenkins'],
     metric: '4 microservices · JWT + Google OAuth · S3 uploads',
-    proofType: 'LIVE_DEMO',
     liveUrl: null,
     screenshots: [],
-    architectureImg: null,
     overview:
       'Real-estate platform connecting buyers, sellers, agents & service providers; MLS data sync, AI property search, Stripe billing.',
     contribution:
@@ -270,7 +254,7 @@ export const FALLBACK_EXPERIENCE: Experience[] = [
     company: 'Humancloud Technologies',
     location: 'Pune, India',
     startDate: '2024-07-01',
-    endDate: 'Present',
+    endDate: null,
     bullets: [
       'Architected a 3-service production Monte Carlo platform for Siam Commercial Bank (TensorFlow GBM + Cholesky, FastAPI + ARQ over Oracle, SFTP ingestion).',
       'Owned the ~185-endpoint Client backend on Teamcast (Express + Prisma) + Candidate/Client portals.',
@@ -300,24 +284,24 @@ export const FALLBACK_ACHIEVEMENTS: Achievement[] = [
     id: 'a1',
     title: '"Going Beyond" Award',
     description: 'Awarded by Humancloud Technologies for delivering critical production features across multiple projects.',
-    year: '2025',
-    type: 'AWARD',
+    date: '2025-01-01',
+    image: null,
     order: 0,
   },
   {
     id: 'a2',
     title: 'Simulix Mentorship',
     description: 'Mentored interns building Simulix — Humancloud\'s internal Monte Carlo demo platform.',
-    year: '2025',
-    type: 'MENTORING',
+    date: '2025-01-01',
+    image: null,
     order: 1,
   },
   {
     id: 'a3',
     title: 'B.E. in Artificial Intelligence & Data Science',
     description: 'Zeal College of Engineering & Research, Pune — CGPA 8.9/10',
-    year: '2024',
-    type: 'EDUCATION',
+    date: '2024-06-01',
+    image: null,
     order: 2,
   },
 ];

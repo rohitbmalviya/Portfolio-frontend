@@ -5,9 +5,20 @@
 //  section type. One big switch on type → matching form.
 // ============================================================
 
-import { useState } from 'react';
-import { Plus, Trash2 } from 'lucide-react';
-import type { SectionType, SectionData } from '@/lib/types';
+import { useEffect, useRef, useState } from 'react';
+import { ChevronDown, ChevronRight, Plus, Trash2 } from 'lucide-react';
+import type { SectionType, SectionData, Experience, Education, Skill, Project, BlogPost, Achievement } from '@/lib/types';
+import {
+  adminExperience,
+  adminEducation,
+  adminSkills,
+  adminProjects,
+  adminBlog,
+  adminAchievements,
+} from '@/lib/admin-api';
+import { getConfigOptions } from '@/lib/api';
+import type { ConfigOption } from '@/lib/api';
+import Link from 'next/link';
 import {
   AdminInput,
   AdminTextarea,
@@ -93,7 +104,8 @@ function HeroForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData)
                   }}
                 />
                 <AdminInput
-                  placeholder="href"
+                  type="text"
+                  placeholder="https://… or /page"
                   value={btn.href}
                   onChange={(e) => {
                     const next = [...buttons];
@@ -114,15 +126,16 @@ function HeroForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData)
                   ]}
                 />
               </div>
-              <button
+              <AdminButton
+                variant="danger"
+                size="sm"
                 type="button"
-                onClick={() => field(data, onChange, 'buttons', buttons.filter((_, j) => j !== i))}
                 aria-label="Remove button"
                 className="mt-1"
-                style={{ color: 'var(--muted)' }}
+                onClick={() => field(data, onChange, 'buttons', buttons.filter((_, j) => j !== i))}
               >
-                <Trash2 size={14} aria-hidden="true" />
-              </button>
+                <Trash2 size={13} aria-hidden="true" /> Remove
+              </AdminButton>
             </div>
           ))}
           <AdminButton
@@ -167,15 +180,16 @@ function HeroForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData)
                   field(data, onChange, 'metrics', next);
                 }}
               />
-              <button
+              <AdminButton
+                variant="danger"
+                size="sm"
                 type="button"
-                onClick={() => field(data, onChange, 'metrics', metrics.filter((_, j) => j !== i))}
                 aria-label="Remove metric"
-                className="mt-2.5"
-                style={{ color: 'var(--muted)' }}
+                className="mt-1"
+                onClick={() => field(data, onChange, 'metrics', metrics.filter((_, j) => j !== i))}
               >
-                <Trash2 size={14} aria-hidden="true" />
-              </button>
+                <Trash2 size={13} aria-hidden="true" /> Remove
+              </AdminButton>
             </div>
           ))}
           <AdminButton
@@ -212,7 +226,7 @@ function AboutForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData
           Paragraphs
         </p>
         {paragraphs.map((p, i) => (
-          <div key={i} className="flex gap-2 mb-2">
+          <div key={i} className="flex flex-col gap-1.5 mb-2">
             <AdminTextarea
               value={p}
               onChange={(e) => {
@@ -221,19 +235,20 @@ function AboutForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData
                 field(data, onChange, 'paragraphs', next);
               }}
               rows={3}
-              className="flex-1"
             />
-            <button
-              type="button"
-              onClick={() =>
-                field(data, onChange, 'paragraphs', paragraphs.filter((_, j) => j !== i))
-              }
-              aria-label="Remove paragraph"
-              className="mt-2"
-              style={{ color: 'var(--muted)' }}
-            >
-              <Trash2 size={14} aria-hidden="true" />
-            </button>
+            <div className="flex justify-end">
+              <AdminButton
+                variant="danger"
+                size="sm"
+                type="button"
+                aria-label="Remove paragraph"
+                onClick={() =>
+                  field(data, onChange, 'paragraphs', paragraphs.filter((_, j) => j !== i))
+                }
+              >
+                <Trash2 size={13} aria-hidden="true" /> Remove
+              </AdminButton>
+            </div>
           </div>
         ))}
         <AdminButton
@@ -249,7 +264,100 @@ function AboutForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData
   );
 }
 
+// Group key → human label (mirrors skills-section.tsx)
+const SKILL_GROUP_LABELS: Record<string, string> = {
+  LANGUAGES: 'Languages',
+  FRONTEND: 'Frontend',
+  BACKEND: 'Backend',
+  DATA: 'Data',
+  CLOUD_DEVOPS: 'Cloud / DevOps',
+  AI: 'AI / ML',
+};
+
+// Group display order — mirrors the public renderer's GROUP_ORDER
+const SKILLS_GROUP_ORDER = ['LANGUAGES', 'FRONTEND', 'BACKEND', 'DATA', 'CLOUD_DEVOPS', 'AI'];
+
+// Tri-state checkbox: checked / indeterminate / unchecked
+function GroupCheckbox({
+  checked,
+  indeterminate,
+  onChange,
+}: {
+  checked: boolean;
+  indeterminate: boolean;
+  onChange: () => void;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = indeterminate;
+  }, [indeterminate]);
+  return (
+    <input
+      ref={ref}
+      type="checkbox"
+      checked={checked}
+      onChange={(_e) => onChange()}
+      style={{ accentColor: 'var(--accent)' }}
+    />
+  );
+}
+
 function SkillsForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
+  const [allSkills, setAllSkills] = useState<Skill[]>([]);
+  const [loadingSkills, setLoadingSkills] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const mode: 'all' | 'selected' = data.mode ?? 'all';
+  const selectedIds: string[] = Array.isArray(data.ids) ? (data.ids as string[]) : [];
+
+  useEffect(() => {
+    setLoadingSkills(true);
+    adminSkills.list()
+      .then((skills: Skill[]) => setAllSkills(skills))
+      .catch(() => {})
+      .finally(() => setLoadingSkills(false));
+  }, []);
+
+  // Ordered groups, each carrying their sorted skills, empty groups hidden
+  const groupedSkills = SKILLS_GROUP_ORDER
+    .map((groupKey) => ({
+      key: groupKey,
+      label: SKILL_GROUP_LABELS[groupKey] ?? groupKey,
+      skills: allSkills
+        .filter((s) => s.group === groupKey)
+        .sort((a, b) => a.order - b.order),
+    }))
+    .filter((g) => g.skills.length > 0);
+
+  function toggleSkillId(id: string) {
+    const next = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+    field(data, onChange, 'ids', next);
+  }
+
+  function toggleGroupIds(groupKey: string, groupSkills: Skill[]) {
+    const groupIds = groupSkills.map((s) => s.id);
+    const allSelected = groupIds.every((id) => selectedIds.includes(id));
+    if (allSelected) {
+      // Deselect all in this group
+      field(data, onChange, 'ids', selectedIds.filter((id) => !groupIds.includes(id)));
+    } else {
+      // Select all in this group and auto-expand it
+      const toAdd = groupIds.filter((id) => !selectedIds.includes(id));
+      field(data, onChange, 'ids', [...selectedIds, ...toAdd]);
+      setExpandedGroups((prev) => new Set([...prev, groupKey]));
+    }
+  }
+
+  function toggleExpand(groupKey: string) {
+    setExpandedGroups((prev) => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) next.delete(groupKey);
+      else next.add(groupKey);
+      return next;
+    });
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <AdminInput
@@ -258,37 +366,135 @@ function SkillsForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionDat
         onChange={(e) => field(data, onChange, 'heading', e.target.value)}
       />
       <AdminSelect
-        label="Source"
-        value={data.source ?? 'skills-table'}
-        onChange={(e) => field(data, onChange, 'source', e.target.value)}
+        label="Display mode"
+        value={mode}
+        onChange={(e) => field(data, onChange, 'mode', e.target.value)}
         options={[
-          { value: 'skills-table', label: 'From Skills table (managed in Skills section)' },
-          { value: 'inline', label: 'Inline groups (defined here)' },
+          { value: 'all', label: 'Show all' },
+          { value: 'selected', label: 'Show selected' },
         ]}
       />
-      <p className="text-[12px]" style={{ color: 'var(--muted)' }}>
-        Using &quot;Skills table&quot; will pull data from the Skills CRUD section automatically.
-      </p>
+      {mode === 'selected' && (
+        <div>
+          <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+            Select skills to display
+          </p>
+          {loadingSkills ? (
+            <p className="text-[12px]" style={{ color: 'var(--muted)' }}>Loading…</p>
+          ) : (
+            <div
+              className="rounded-[10px] border overflow-hidden"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-2)' }}
+            >
+              {groupedSkills.length === 0 ? (
+                <p className="text-[12px] px-3 py-2" style={{ color: 'var(--muted)' }}>No skills found.</p>
+              ) : (
+                groupedSkills.map((group, idx) => {
+                  const groupIds = group.skills.map((s) => s.id);
+                  const selectedCount = groupIds.filter((id) => selectedIds.includes(id)).length;
+                  const allSelected = groupIds.length > 0 && selectedCount === groupIds.length;
+                  const someSelected = selectedCount > 0 && !allSelected;
+                  const isExpanded = expandedGroups.has(group.key);
+
+                  return (
+                    <div
+                      key={group.key}
+                      className={idx > 0 ? 'border-t' : ''}
+                      style={idx > 0 ? { borderColor: 'var(--border)' } : undefined}
+                    >
+                      {/* Group header row: chevron + tri-state checkbox + label/count */}
+                      <div className="flex items-center gap-2 px-3 py-2">
+                        <button
+                          type="button"
+                          aria-label={isExpanded ? `Collapse ${group.label}` : `Expand ${group.label}`}
+                          onClick={() => toggleExpand(group.key)}
+                          style={{ color: 'var(--muted)' }}
+                        >
+                          {isExpanded
+                            ? <ChevronDown size={14} aria-hidden="true" />
+                            : <ChevronRight size={14} aria-hidden="true" />
+                          }
+                        </button>
+                        <GroupCheckbox
+                          checked={allSelected}
+                          indeterminate={someSelected}
+                          onChange={() => toggleGroupIds(group.key, group.skills)}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => toggleExpand(group.key)}
+                          className="flex-1 text-left text-[13px] font-medium"
+                          style={{ color: 'var(--text)' }}
+                        >
+                          {group.label}
+                          <span className="ml-2 text-[11px] font-normal" style={{ color: 'var(--muted)' }}>
+                            {selectedCount}/{groupIds.length}
+                          </span>
+                        </button>
+                      </div>
+                      {/* Expanded: individual skill checkboxes */}
+                      {isExpanded && (
+                        <div
+                          className="flex flex-col gap-0.5 pt-1 pb-2 px-2"
+                          style={{ borderTop: '1px solid var(--border)' }}
+                        >
+                          {group.skills.map((skill) => (
+                            <label
+                              key={skill.id}
+                              className="flex items-center gap-2 cursor-pointer py-1 pl-8 pr-2 rounded-[6px] transition-colors"
+                              style={{ color: 'var(--text)' }}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={selectedIds.includes(skill.id)}
+                                onChange={() => toggleSkillId(skill.id)}
+                                style={{ accentColor: 'var(--accent)' }}
+                              />
+                              <span className="text-[13px]">{skill.name}</span>
+                            </label>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      <Link
+        href="/admin/skills"
+        className="text-[12px] hover:opacity-75 transition-opacity self-start"
+        style={{ color: 'var(--muted)' }}
+      >
+        Manage skills →
+      </Link>
     </div>
   );
 }
 
 function ExperienceForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
-  return (
-    <div className="flex flex-col gap-4">
-      <AdminInput
-        label="Heading"
-        value={data.heading ?? ''}
-        onChange={(e) => field(data, onChange, 'heading', e.target.value)}
-      />
-      <p className="text-[12px]" style={{ color: 'var(--muted)' }}>
-        Data is pulled from the Experience table automatically.
-      </p>
-    </div>
-  );
-}
+  const [experiences, setExperiences] = useState<Experience[]>([]);
+  const [loadingExp, setLoadingExp] = useState(false);
+  const mode: 'all' | 'selected' = data.mode ?? 'all';
+  const selectedIds: string[] = Array.isArray(data.ids) ? (data.ids as string[]) : [];
 
-function FeaturedProjectsForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
+  useEffect(() => {
+    setLoadingExp(true);
+    adminExperience.list()
+      .then(setExperiences)
+      .catch(() => {})
+      .finally(() => setLoadingExp(false));
+  }, []);
+
+  function toggleId(id: string) {
+    const next = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+    field(data, onChange, 'ids', next);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <AdminInput
@@ -297,11 +503,95 @@ function FeaturedProjectsForm({ data, onChange }: { data: AnyObj; onChange: (d: 
         onChange={(e) => field(data, onChange, 'heading', e.target.value)}
       />
       <AdminSelect
-        label="Source"
-        value={data.auto ?? 'featured'}
-        onChange={(e) => field(data, onChange, 'auto', e.target.value)}
+        label="Display mode"
+        value={mode}
+        onChange={(e) => field(data, onChange, 'mode', e.target.value)}
         options={[
-          { value: 'featured', label: 'Auto: use featured projects' },
+          { value: 'all', label: 'Show all' },
+          { value: 'selected', label: 'Show selected' },
+        ]}
+      />
+      {mode === 'selected' && (
+        <div>
+          <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+            Select experiences to display
+          </p>
+          {loadingExp ? (
+            <p className="text-[12px]" style={{ color: 'var(--muted)' }}>Loading…</p>
+          ) : (
+            <div
+              className="max-h-[200px] overflow-y-auto rounded-[10px] border p-2 flex flex-col gap-0.5"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-2)' }}
+            >
+              {experiences.length === 0 ? (
+                <p className="text-[12px] px-1" style={{ color: 'var(--muted)' }}>No experience entries yet.</p>
+              ) : (
+                experiences.map((exp) => (
+                  <label
+                    key={exp.id}
+                    className="flex items-center gap-2 cursor-pointer py-1 px-2 rounded-[6px] transition-colors"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(exp.id)}
+                      onChange={() => toggleId(exp.id)}
+                      style={{ accentColor: 'var(--accent)' }}
+                    />
+                    <span className="text-[13px]">{exp.role} — {exp.company}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      <Link
+        href="/admin/experience"
+        className="text-[12px] hover:opacity-75 transition-opacity self-start"
+        style={{ color: 'var(--muted)' }}
+      >
+        Manage experience →
+      </Link>
+    </div>
+  );
+}
+
+function FeaturedProjectsForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [loadingProjects, setLoadingProjects] = useState(false);
+  const mode: 'all' | 'selected' = data.mode ?? 'all';
+  const selectedIds: string[] = Array.isArray(data.ids) ? (data.ids as string[]) : [];
+
+  useEffect(() => {
+    setLoadingProjects(true);
+    adminProjects.list()
+      .then(setProjects)
+      .catch(() => {})
+      .finally(() => setLoadingProjects(false));
+  }, []);
+
+  function toggleId(id: string) {
+    const next = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+    field(data, onChange, 'ids', next);
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      <AdminInput
+        label="Heading"
+        value={data.heading ?? ''}
+        onChange={(e) => field(data, onChange, 'heading', e.target.value)}
+      />
+      <AdminSelect
+        label="Display mode"
+        value={mode}
+        onChange={(e) => field(data, onChange, 'mode', e.target.value)}
+        options={[
+          { value: 'all', label: 'Show all (featured)' },
+          { value: 'selected', label: 'Show selected' },
         ]}
       />
       <AdminInput
@@ -312,6 +602,48 @@ function FeaturedProjectsForm({ data, onChange }: { data: AnyObj; onChange: (d: 
         min={1}
         max={10}
       />
+      {mode === 'selected' && (
+        <div>
+          <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+            Select projects to display
+          </p>
+          {loadingProjects ? (
+            <p className="text-[12px]" style={{ color: 'var(--muted)' }}>Loading…</p>
+          ) : (
+            <div
+              className="max-h-[200px] overflow-y-auto rounded-[10px] border p-2 flex flex-col gap-0.5"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-2)' }}
+            >
+              {projects.length === 0 ? (
+                <p className="text-[12px] px-1" style={{ color: 'var(--muted)' }}>No projects yet.</p>
+              ) : (
+                projects.map((proj) => (
+                  <label
+                    key={proj.id}
+                    className="flex items-center gap-2 cursor-pointer py-1 px-2 rounded-[6px] transition-colors"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(proj.id)}
+                      onChange={() => toggleId(proj.id)}
+                      style={{ accentColor: 'var(--accent)' }}
+                    />
+                    <span className="text-[13px]">{proj.title}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      <Link
+        href="/admin/projects"
+        className="text-[12px] hover:opacity-75 transition-opacity self-start"
+        style={{ color: 'var(--muted)' }}
+      >
+        Manage projects →
+      </Link>
     </div>
   );
 }
@@ -343,6 +675,26 @@ function ProjectsGridForm({ data, onChange }: { data: AnyObj; onChange: (d: Sect
 }
 
 function BlogTeaserForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
+  const [posts, setPosts] = useState<BlogPost[]>([]);
+  const [loadingPosts, setLoadingPosts] = useState(false);
+  const mode: 'latest' | 'selected' = data.mode ?? 'latest';
+  const selectedIds: string[] = Array.isArray(data.ids) ? (data.ids as string[]) : [];
+
+  useEffect(() => {
+    setLoadingPosts(true);
+    adminBlog.list()
+      .then(setPosts)
+      .catch(() => {})
+      .finally(() => setLoadingPosts(false));
+  }, []);
+
+  function toggleId(id: string) {
+    const next = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+    field(data, onChange, 'ids', next);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <AdminInput
@@ -350,19 +702,92 @@ function BlogTeaserForm({ data, onChange }: { data: AnyObj; onChange: (d: Sectio
         value={data.heading ?? ''}
         onChange={(e) => field(data, onChange, 'heading', e.target.value)}
       />
-      <AdminInput
-        label="Limit"
-        type="number"
-        value={data.limit ?? 3}
-        onChange={(e) => field(data, onChange, 'limit', Number(e.target.value))}
-        min={1}
-        max={10}
+      <AdminSelect
+        label="Display mode"
+        value={mode}
+        onChange={(e) => field(data, onChange, 'mode', e.target.value)}
+        options={[
+          { value: 'latest', label: 'Latest (by limit)' },
+          { value: 'selected', label: 'Selected posts' },
+        ]}
       />
+      {mode === 'latest' && (
+        <AdminInput
+          label="Limit"
+          type="number"
+          value={data.limit ?? 3}
+          onChange={(e) => field(data, onChange, 'limit', Number(e.target.value))}
+          min={1}
+          max={10}
+        />
+      )}
+      {mode === 'selected' && (
+        <div>
+          <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+            Select posts to display
+          </p>
+          {loadingPosts ? (
+            <p className="text-[12px]" style={{ color: 'var(--muted)' }}>Loading…</p>
+          ) : (
+            <div
+              className="max-h-[200px] overflow-y-auto rounded-[10px] border p-2 flex flex-col gap-0.5"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-2)' }}
+            >
+              {posts.length === 0 ? (
+                <p className="text-[12px] px-1" style={{ color: 'var(--muted)' }}>No blog posts yet.</p>
+              ) : (
+                posts.map((post) => (
+                  <label
+                    key={post.id}
+                    className="flex items-center gap-2 cursor-pointer py-1 px-2 rounded-[6px] transition-colors"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(post.id)}
+                      onChange={() => toggleId(post.id)}
+                      style={{ accentColor: 'var(--accent)' }}
+                    />
+                    <span className="text-[13px]">{post.title}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      <Link
+        href="/admin/blog"
+        className="text-[12px] hover:opacity-75 transition-opacity self-start"
+        style={{ color: 'var(--muted)' }}
+      >
+        Manage blog →
+      </Link>
     </div>
   );
 }
 
 function AchievementsForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [loadingAch, setLoadingAch] = useState(false);
+  const mode: 'all' | 'selected' = data.mode ?? 'all';
+  const selectedIds: string[] = Array.isArray(data.ids) ? (data.ids as string[]) : [];
+
+  useEffect(() => {
+    setLoadingAch(true);
+    adminAchievements.list()
+      .then(setAchievements)
+      .catch(() => {})
+      .finally(() => setLoadingAch(false));
+  }, []);
+
+  function toggleId(id: string) {
+    const next = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+    field(data, onChange, 'ids', next);
+  }
+
   return (
     <div className="flex flex-col gap-4">
       <AdminInput
@@ -370,15 +795,81 @@ function AchievementsForm({ data, onChange }: { data: AnyObj; onChange: (d: Sect
         value={data.heading ?? ''}
         onChange={(e) => field(data, onChange, 'heading', e.target.value)}
       />
-      <p className="text-[12px]" style={{ color: 'var(--muted)' }}>
-        Data is pulled from the Achievements table automatically.
-      </p>
+      <AdminSelect
+        label="Display mode"
+        value={mode}
+        onChange={(e) => field(data, onChange, 'mode', e.target.value)}
+        options={[
+          { value: 'all', label: 'Show all' },
+          { value: 'selected', label: 'Show selected' },
+        ]}
+      />
+      {mode === 'selected' && (
+        <div>
+          <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+            Select achievements to display
+          </p>
+          {loadingAch ? (
+            <p className="text-[12px]" style={{ color: 'var(--muted)' }}>Loading…</p>
+          ) : (
+            <div
+              className="max-h-[200px] overflow-y-auto rounded-[10px] border p-2 flex flex-col gap-0.5"
+              style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-2)' }}
+            >
+              {achievements.length === 0 ? (
+                <p className="text-[12px] px-1" style={{ color: 'var(--muted)' }}>No achievements yet.</p>
+              ) : (
+                achievements.map((ach) => (
+                  <label
+                    key={ach.id}
+                    className="flex items-center gap-2 cursor-pointer py-1 px-2 rounded-[6px] transition-colors"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(ach.id)}
+                      onChange={() => toggleId(ach.id)}
+                      style={{ accentColor: 'var(--accent)' }}
+                    />
+                    <span className="text-[13px]">{ach.title}</span>
+                  </label>
+                ))
+              )}
+            </div>
+          )}
+        </div>
+      )}
+      <Link
+        href="/admin/achievements"
+        className="text-[12px] hover:opacity-75 transition-opacity self-start"
+        style={{ color: 'var(--muted)' }}
+      >
+        Manage achievements →
+      </Link>
     </div>
   );
 }
 
 function EducationForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
-  const items: { degree: string; school: string; period: string; detail?: string }[] = data.items ?? [];
+  const [education, setEducation] = useState<Education[]>([]);
+  const [loadingEdu, setLoadingEdu] = useState(false);
+  const mode: 'all' | 'selected' = data.mode ?? 'all';
+  const selectedIds: string[] = Array.isArray(data.ids) ? (data.ids as string[]) : [];
+
+  useEffect(() => {
+    setLoadingEdu(true);
+    adminEducation.list()
+      .then(setEducation)
+      .catch(() => {})
+      .finally(() => setLoadingEdu(false));
+  }, []);
+
+  function toggleId(id: string) {
+    const next = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+    field(data, onChange, 'ids', next);
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -387,87 +878,86 @@ function EducationForm({ data, onChange }: { data: AnyObj; onChange: (d: Section
         value={data.heading ?? ''}
         onChange={(e) => field(data, onChange, 'heading', e.target.value)}
       />
-      <div>
-        <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
-          Education Items
-        </p>
-        <div className="flex flex-col gap-3">
-          {items.map((item, i) => (
+      <AdminSelect
+        label="Display mode"
+        value={mode}
+        onChange={(e) => field(data, onChange, 'mode', e.target.value)}
+        options={[
+          { value: 'all', label: 'Show all' },
+          { value: 'selected', label: 'Show selected' },
+        ]}
+      />
+      {mode === 'selected' && (
+        <div>
+          <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+            Select education entries to display
+          </p>
+          {loadingEdu ? (
+            <p className="text-[12px]" style={{ color: 'var(--muted)' }}>Loading…</p>
+          ) : (
             <div
-              key={i}
-              className="p-3 rounded-[10px] border flex flex-col gap-2"
+              className="max-h-[200px] overflow-y-auto rounded-[10px] border p-2 flex flex-col gap-0.5"
               style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-2)' }}
             >
-              <div className="grid grid-cols-2 gap-2">
-                <AdminInput
-                  placeholder="Degree"
-                  value={item.degree}
-                  onChange={(e) => {
-                    const next = [...items];
-                    next[i] = { ...item, degree: e.target.value };
-                    field(data, onChange, 'items', next);
-                  }}
-                />
-                <AdminInput
-                  placeholder="School"
-                  value={item.school}
-                  onChange={(e) => {
-                    const next = [...items];
-                    next[i] = { ...item, school: e.target.value };
-                    field(data, onChange, 'items', next);
-                  }}
-                />
-                <AdminInput
-                  placeholder="Period (e.g. 2020–2024)"
-                  value={item.period}
-                  onChange={(e) => {
-                    const next = [...items];
-                    next[i] = { ...item, period: e.target.value };
-                    field(data, onChange, 'items', next);
-                  }}
-                />
-                <AdminInput
-                  placeholder="Detail (optional)"
-                  value={item.detail ?? ''}
-                  onChange={(e) => {
-                    const next = [...items];
-                    next[i] = { ...item, detail: e.target.value };
-                    field(data, onChange, 'items', next);
-                  }}
-                />
-              </div>
-              <div className="flex justify-end">
-                <AdminButton
-                  size="sm"
-                  variant="danger"
-                  onClick={() => field(data, onChange, 'items', items.filter((_, j) => j !== i))}
-                  type="button"
-                >
-                  Remove
-                </AdminButton>
-              </div>
+              {education.length === 0 ? (
+                <p className="text-[12px] px-1" style={{ color: 'var(--muted)' }}>No education entries yet.</p>
+              ) : (
+                education.map((edu) => (
+                  <label
+                    key={edu.id}
+                    className="flex items-center gap-2 cursor-pointer py-1 px-2 rounded-[6px] transition-colors"
+                    style={{ color: 'var(--text)' }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.includes(edu.id)}
+                      onChange={() => toggleId(edu.id)}
+                      style={{ accentColor: 'var(--accent)' }}
+                    />
+                    <span className="text-[13px]">{edu.degree} — {edu.school}</span>
+                  </label>
+                ))
+              )}
             </div>
-          ))}
-          <AdminButton
-            variant="ghost"
-            size="sm"
-            onClick={() =>
-              field(data, onChange, 'items', [
-                ...items,
-                { degree: '', school: '', period: '', detail: '' },
-              ])
-            }
-            type="button"
-          >
-            <Plus size={14} aria-hidden="true" /> Add education
-          </AdminButton>
+          )}
         </div>
-      </div>
+      )}
+      <Link
+        href="/admin/education"
+        className="text-[12px] hover:opacity-75 transition-opacity self-start"
+        style={{ color: 'var(--muted)' }}
+      >
+        Manage education →
+      </Link>
     </div>
   );
 }
 
+const LINK_TYPE_OPTIONS: ConfigOption[] = [
+  { value: 'email', label: 'Email' },
+  { value: 'phone', label: 'Phone' },
+  { value: 'website', label: 'Website' },
+  { value: 'linkedin', label: 'LinkedIn' },
+  { value: 'github', label: 'GitHub' },
+  { value: 'twitter', label: 'X (Twitter)' },
+  { value: 'instagram', label: 'Instagram' },
+  { value: 'youtube', label: 'YouTube' },
+  { value: 'medium', label: 'Medium' },
+  { value: 'dribbble', label: 'Dribbble' },
+  { value: 'telegram', label: 'Telegram' },
+  { value: 'resume', label: 'Resume / CV' },
+];
+
 function ContactForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
+  const links: { type: string; value: string }[] = data.links ?? [];
+  const [linkTypeOptions, setLinkTypeOptions] = useState<ConfigOption[]>(LINK_TYPE_OPTIONS);
+
+  useEffect(() => {
+    getConfigOptions('contact_link_types').then((opts) => {
+      if (opts.length > 0) setLinkTypeOptions(opts);
+    });
+  }, []);
+
   return (
     <div className="flex flex-col gap-4">
       <AdminInput
@@ -481,22 +971,68 @@ function ContactForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionDa
         onChange={(e) => field(data, onChange, 'blurb', e.target.value)}
         rows={3}
       />
-      <AdminInput
-        label="Email"
-        type="email"
-        value={data.email ?? ''}
-        onChange={(e) => field(data, onChange, 'email', e.target.value)}
-      />
-      <AdminInput
-        label="Resume URL"
-        value={data.resumeUrl ?? ''}
-        onChange={(e) => field(data, onChange, 'resumeUrl', e.target.value)}
-      />
       <AdminToggle
         label="Show contact form"
         checked={data.showForm ?? false}
         onChange={(v) => field(data, onChange, 'showForm', v)}
       />
+
+      {/* Dynamic social / contact links */}
+      <div>
+        <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+          Links
+        </p>
+        <div className="flex flex-col gap-2">
+          {links.map((link, i) => (
+            <div key={i} className="flex gap-2 items-center">
+              <div className="flex-1">
+                <AdminSelect
+                  value={link.type}
+                  onChange={(e) => {
+                    const next = [...links];
+                    next[i] = { ...link, type: e.target.value };
+                    field(data, onChange, 'links', next);
+                  }}
+                  options={linkTypeOptions}
+                />
+              </div>
+              <div className="flex-1">
+                <AdminInput
+                  type={link.type === 'email' ? 'email' : 'url'}
+                  placeholder="URL or address"
+                  value={link.value}
+                  onChange={(e) => {
+                    const next = [...links];
+                    next[i] = { ...link, value: e.target.value };
+                    field(data, onChange, 'links', next);
+                  }}
+                />
+              </div>
+              <AdminButton
+                variant="danger"
+                size="sm"
+                type="button"
+                aria-label="Remove link"
+                onClick={() =>
+                  field(data, onChange, 'links', links.filter((_, j) => j !== i))
+                }
+              >
+                <Trash2 size={13} aria-hidden="true" /> Remove
+              </AdminButton>
+            </div>
+          ))}
+          <AdminButton
+            variant="ghost"
+            size="sm"
+            type="button"
+            onClick={() =>
+              field(data, onChange, 'links', [...links, { type: 'email', value: '' }])
+            }
+          >
+            <Plus size={14} aria-hidden="true" /> Add link
+          </AdminButton>
+        </div>
+      </div>
     </div>
   );
 }
@@ -508,36 +1044,40 @@ function MetricsForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionDa
     <div className="flex flex-col gap-4">
       <div className="flex flex-col gap-2">
         {items.map((item, i) => (
-          <div key={i} className="flex gap-2 items-start">
-            <AdminInput
-              placeholder="Value (e.g. 5+)"
-              value={item.value}
-              onChange={(e) => {
-                const next = [...items];
-                next[i] = { ...item, value: e.target.value };
-                field(data, onChange, 'items', next);
-              }}
-            />
-            <AdminInput
-              placeholder="Label"
-              value={item.label}
-              onChange={(e) => {
-                const next = [...items];
-                next[i] = { ...item, label: e.target.value };
-                field(data, onChange, 'items', next);
-              }}
-            />
-            <button
+          <div key={i} className="flex gap-2 items-center">
+            <div className="flex-1">
+              <AdminInput
+                placeholder="Value (e.g. 5+)"
+                value={item.value}
+                onChange={(e) => {
+                  const next = [...items];
+                  next[i] = { ...item, value: e.target.value };
+                  field(data, onChange, 'items', next);
+                }}
+              />
+            </div>
+            <div className="flex-1">
+              <AdminInput
+                placeholder="Label"
+                value={item.label}
+                onChange={(e) => {
+                  const next = [...items];
+                  next[i] = { ...item, label: e.target.value };
+                  field(data, onChange, 'items', next);
+                }}
+              />
+            </div>
+            <AdminButton
+              variant="danger"
+              size="sm"
               type="button"
+              aria-label="Remove metric"
               onClick={() =>
                 field(data, onChange, 'items', items.filter((_, j) => j !== i))
               }
-              aria-label="Remove metric"
-              className="mt-2.5"
-              style={{ color: 'var(--muted)' }}
             >
-              <Trash2 size={14} aria-hidden="true" />
-            </button>
+              <Trash2 size={13} aria-hidden="true" /> Remove
+            </AdminButton>
           </div>
         ))}
         <AdminButton
@@ -597,6 +1137,8 @@ function CtaForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) 
         />
         <AdminInput
           label="Button href"
+          type="text"
+          placeholder="https://… or /page"
           value={button.href}
           onChange={(e) => field(data, onChange, 'button', { ...button, href: e.target.value })}
         />

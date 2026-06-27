@@ -6,8 +6,8 @@
 //  Calls POST /api/media and returns the cloudinaryUrl.
 // ============================================================
 
-import { useCallback, useRef, useState } from 'react';
-import { Upload, X, Loader2, ImageIcon } from 'lucide-react';
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { Upload, X, Loader2, ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { adminMedia } from '@/lib/admin-api';
 import { cn } from '@/lib/utils';
 import { useToast } from './toast';
@@ -30,6 +30,7 @@ export function ImageUpload({
   const { error: toastError } = useToast();
   const [uploading, setUploading] = useState(false);
   const [dragOver, setDragOver] = useState(false);
+  const [zoomed, setZoomed] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
 
   const upload = useCallback(
@@ -75,7 +76,8 @@ export function ImageUpload({
           <img
             src={value}
             alt="Upload preview"
-            className="w-full max-h-48 object-cover"
+            className="w-full max-h-48 object-cover cursor-zoom-in"
+            onClick={() => setZoomed(true)}
           />
           <button
             type="button"
@@ -154,6 +156,35 @@ export function ImageUpload({
           )}
         </div>
       )}
+
+      {/* Lightbox — full image preview */}
+      {zoomed && value && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}
+          onClick={() => setZoomed(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={value}
+            alt="Full preview"
+            className="max-w-full max-h-full object-contain rounded-[8px]"
+            onClick={(e) => e.stopPropagation()}
+          />
+          <button
+            type="button"
+            onClick={() => setZoomed(false)}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full grid place-items-center"
+            style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+            aria-label="Close preview"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }
@@ -172,7 +203,29 @@ interface MultiImageUploadProps {
 export function MultiImageUpload({ value, onChange, label }: MultiImageUploadProps) {
   const { error: toastError } = useToast();
   const [uploading, setUploading] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  const closeLightbox = useCallback(() => setLightboxIndex(null), []);
+  const showPrev = useCallback(
+    () => setLightboxIndex((i) => (i === null ? i : (i - 1 + value.length) % value.length)),
+    [value.length],
+  );
+  const showNext = useCallback(
+    () => setLightboxIndex((i) => (i === null ? i : (i + 1) % value.length)),
+    [value.length],
+  );
+
+  useEffect(() => {
+    if (lightboxIndex === null) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') closeLightbox();
+      else if (e.key === 'ArrowLeft') showPrev();
+      else if (e.key === 'ArrowRight') showNext();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [lightboxIndex, closeLightbox, showPrev, showNext]);
 
   async function uploadFiles(files: FileList) {
     setUploading(true);
@@ -210,29 +263,34 @@ export function MultiImageUpload({ value, onChange, label }: MultiImageUploadPro
         </span>
       )}
 
-      {/* Thumbnails grid */}
+      {/* Thumbnails grid — 2 per row, click to zoom */}
       {value.length > 0 && (
-        <div className="grid grid-cols-3 gap-3">
+        <div className="grid grid-cols-2 gap-3">
           {value.map((item, i) => (
             <div key={i} className="flex flex-col gap-1">
               <div
-                className="relative rounded-[8px] overflow-hidden border"
+                className="relative aspect-video rounded-[8px] overflow-hidden border cursor-zoom-in group"
                 style={{ borderColor: 'var(--border)' }}
+                onClick={() => setLightboxIndex(i)}
+                role="button"
+                tabIndex={0}
+                aria-label={`View screenshot ${i + 1} full size`}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && setLightboxIndex(i)}
               >
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={item.url}
                   alt={item.alt || `Screenshot ${i + 1}`}
-                  className="w-full h-24 object-cover"
+                  className="w-full h-full object-cover transition-transform duration-200 group-hover:scale-[1.03]"
                 />
                 <button
                   type="button"
-                  onClick={() => removeItem(i)}
-                  className="absolute top-1 right-1 w-5 h-5 rounded-full grid place-items-center"
+                  onClick={(e) => { e.stopPropagation(); removeItem(i); }}
+                  className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full grid place-items-center"
                   style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
                   aria-label={`Remove screenshot ${i + 1}`}
                 >
-                  <X size={10} aria-hidden="true" />
+                  <X size={12} aria-hidden="true" />
                 </button>
               </div>
               <input
@@ -294,6 +352,65 @@ export function MultiImageUpload({ value, onChange, label }: MultiImageUploadPro
         aria-hidden="true"
         tabIndex={-1}
       />
+
+      {/* Lightbox — full image preview with prev/next */}
+      {lightboxIndex !== null && value[lightboxIndex] && (
+        <div
+          className="fixed inset-0 z-[100] flex items-center justify-center p-6"
+          style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}
+          onClick={closeLightbox}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Image preview"
+        >
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
+            src={value[lightboxIndex].url}
+            alt={value[lightboxIndex].alt || `Screenshot ${lightboxIndex + 1}`}
+            className="max-w-full max-h-full object-contain rounded-[8px]"
+            onClick={(e) => e.stopPropagation()}
+          />
+
+          {value.length > 1 && (
+            <>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); showPrev(); }}
+                className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full grid place-items-center"
+                style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+                aria-label="Previous image"
+              >
+                <ChevronLeft size={22} aria-hidden="true" />
+              </button>
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); showNext(); }}
+                className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full grid place-items-center"
+                style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+                aria-label="Next image"
+              >
+                <ChevronRight size={22} aria-hidden="true" />
+              </button>
+              <div
+                className="absolute bottom-5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[12px]"
+                style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+              >
+                {lightboxIndex + 1} / {value.length}
+              </div>
+            </>
+          )}
+
+          <button
+            type="button"
+            onClick={closeLightbox}
+            className="absolute top-4 right-4 w-9 h-9 rounded-full grid place-items-center"
+            style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+            aria-label="Close preview"
+          >
+            <X size={18} aria-hidden="true" />
+          </button>
+        </div>
+      )}
     </div>
   );
 }

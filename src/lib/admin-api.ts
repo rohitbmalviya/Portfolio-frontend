@@ -19,11 +19,13 @@ import type {
   Skill,
   SkillGroup,
   SkillLevel,
+  SkillGroupSection,
   Experience,
+  Education,
   Achievement,
-  AchievementType,
   SiteSettings,
-  ProofType,
+  ConfigOption,
+  Configuration,
 } from './types';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -38,6 +40,7 @@ export interface MediaRecord {
   width?: number | null;
   height?: number | null;
   type?: string | null;
+  category: string;
   createdAt: string;
 }
 
@@ -65,7 +68,7 @@ export interface MeResponse {
 export type CreatePagePayload = Pick<
   Page,
   'slug' | 'title' | 'type'
-> & Partial<Omit<Page, 'id' | 'slug' | 'title' | 'type' | 'sections' | 'createdAt' | 'updatedAt'>>;
+> & Partial<Omit<Page, 'id' | 'slug' | 'title' | 'type' | 'sections' | '_count' | 'createdAt' | 'updatedAt'>>;
 
 export type UpdatePagePayload = Partial<CreatePagePayload>;
 
@@ -105,11 +108,14 @@ export type UpdateSkillPayload = Partial<CreateSkillPayload>;
 export type CreateExperiencePayload = Omit<Experience, 'id'>;
 export type UpdateExperiencePayload = Partial<CreateExperiencePayload>;
 
+export type CreateEducationPayload = Omit<Education, 'id'>;
+export type UpdateEducationPayload = Partial<CreateEducationPayload>;
+
 export interface CreateAchievementPayload {
   title: string;
   description: string;
-  year?: string;
-  type: AchievementType;
+  date?: string | null;
+  image?: string | null;
   order?: number;
 }
 export type UpdateAchievementPayload = Partial<CreateAchievementPayload>;
@@ -214,7 +220,9 @@ export const adminAuth = {
 // ── Pages ─────────────────────────────────────────────────────
 
 export const adminPages = {
-  list: () => adminFetch<Page[]>('/api/pages'),
+  // ?admin=true returns pages with their sections array populated,
+  // which lets the list UI show section counts.
+  list: () => adminFetch<Page[]>('/api/pages?admin=true'),
 
   // Fetch a single page with all its sections by primary key (ID).
   // Uses the dedicated /id/:id route to avoid conflating IDs with slugs.
@@ -273,7 +281,7 @@ export const adminSections = {
 export const adminProjects = {
   list: () => adminFetch<Project[]>('/api/projects?admin=true'),
 
-  get: (id: string) => adminFetch<Project>(`/api/projects/${id}`),
+  get: (id: string) => adminFetch<Project>(`/api/projects/id/${id}`),
 
   create: (payload: CreateProjectPayload) =>
     adminFetch<Project>('/api/projects', {
@@ -308,7 +316,7 @@ export const adminProjects = {
 export const adminBlog = {
   list: () => adminFetch<BlogPost[]>('/api/blog?admin=true'),
 
-  get: (id: string) => adminFetch<BlogPost>(`/api/blog/${id}`),
+  get: (id: string) => adminFetch<BlogPost>(`/api/blog/id/${id}`),
 
   create: (payload: CreateBlogPayload) =>
     adminFetch<BlogPost>('/api/blog', {
@@ -333,6 +341,9 @@ export const adminBlog = {
 
 export const adminSkills = {
   list: () => adminFetch<Skill[]>('/api/skills'),
+
+  /** GET /api/skills/grouped — returns skills pre-grouped in canonical order, empty groups omitted. */
+  listGrouped: () => adminFetch<SkillGroupSection[]>('/api/skills/grouped'),
 
   create: (payload: CreateSkillPayload) =>
     adminFetch<Skill>('/api/skills', {
@@ -361,6 +372,8 @@ export const adminSkills = {
 export const adminExperience = {
   list: () => adminFetch<Experience[]>('/api/experience'),
 
+  get: (id: string) => adminFetch<Experience>(`/api/experience/${id}`),
+
   create: (payload: CreateExperiencePayload) =>
     adminFetch<Experience>('/api/experience', {
       method: 'POST',
@@ -383,10 +396,41 @@ export const adminExperience = {
     }),
 };
 
+// ── Education ─────────────────────────────────────────────────
+
+export const adminEducation = {
+  list: () => adminFetch<Education[]>('/api/education'),
+
+  get: (id: string) => adminFetch<Education>(`/api/education/${id}`),
+
+  create: (payload: CreateEducationPayload) =>
+    adminFetch<Education>('/api/education', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  update: (id: string, payload: UpdateEducationPayload) =>
+    adminFetch<Education>(`/api/education/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+
+  delete: (id: string) =>
+    adminFetch<void>(`/api/education/${id}`, { method: 'DELETE' }),
+
+  reorder: (items: ReorderItem[]) =>
+    adminFetch<void>('/api/education/reorder', {
+      method: 'PATCH',
+      body: JSON.stringify({ education: items }),
+    }),
+};
+
 // ── Achievements ──────────────────────────────────────────────
 
 export const adminAchievements = {
   list: () => adminFetch<Achievement[]>('/api/achievements'),
+
+  get: (id: string) => adminFetch<Achievement>(`/api/achievements/${id}`),
 
   create: (payload: CreateAchievementPayload) =>
     adminFetch<Achievement>('/api/achievements', {
@@ -427,17 +471,61 @@ export const adminSettings = {
 export const adminMedia = {
   list: () => adminFetch<MediaRecord[]>('/api/media'),
 
-  upload: (file: File, alt?: string) => {
+  upload: (file: File, alt?: string, category?: string) => {
     const fd = new FormData();
     fd.append('file', file);
     if (alt) fd.append('alt', alt);
+    if (category) fd.append('category', category);
     return adminUpload<MediaRecord>('/api/media', fd);
   },
+
+  update: (id: string, payload: { category?: string; alt?: string }) =>
+    adminFetch<MediaRecord>(`/api/media/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
 
   delete: (id: string) =>
     adminFetch<void>(`/api/media/${id}`, { method: 'DELETE' }),
 };
 
+// ── Dashboard stats (single call for all content counts) ──────
+
+export interface DashboardCounts {
+  pages: number;
+  projects: number;
+  blogPosts: number;
+  skills: number;
+  experience: number;
+  education: number;
+  achievements: number;
+  media: number;
+}
+
+export const adminStats = {
+  get: () => adminFetch<DashboardCounts>('/api/stats'),
+};
+
+// ── Configuration ─────────────────────────────────────────────
+
+export const adminConfig = {
+  /** GET /api/config — list all config sets */
+  list: () => adminFetch<Configuration[]>('/api/config'),
+
+  /** GET /api/config/:key — fetch a single config set by key */
+  get: (key: string) => adminFetch<Configuration>(`/api/config/${key}`),
+
+  /** PATCH /api/config/:key — upsert items (and optionally label) for a key */
+  update: (
+    key: string,
+    payload: { label?: string; items: ConfigOption[] },
+  ) =>
+    adminFetch<Configuration>(`/api/config/${key}`, {
+      method: 'PATCH',
+      body: JSON.stringify(payload),
+    }),
+};
+
 // ── Helpers re-exported for convenience ───────────────────────
 
-export type { PageType, SectionType };
+export type { PageType, SectionType, ConfigOption, Configuration };

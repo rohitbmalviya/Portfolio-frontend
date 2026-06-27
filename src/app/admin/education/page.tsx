@@ -1,16 +1,15 @@
 'use client';
 
 // ============================================================
-//  Admin Experience — list, reorder, delete
-//  Create / edit are handled by /admin/experience/[id]
+//  Admin Education — list, reorder, delete
+//  Create / edit are handled by /admin/education/[id]
 // ============================================================
 
 import { useEffect, useState } from 'react';
-import { Plus, Briefcase, ChevronUp, ChevronDown, Pencil, Trash2 } from 'lucide-react';
+import { Plus, GraduationCap, ChevronUp, ChevronDown, Pencil, Trash2 } from 'lucide-react';
 import Link from 'next/link';
-import { adminExperience } from '@/lib/admin-api';
-import type { Experience } from '@/lib/types';
-import { formatDate } from '@/lib/utils';
+import { adminEducation } from '@/lib/admin-api';
+import type { Education } from '@/lib/types';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
 import {
@@ -21,16 +20,21 @@ import {
   EmptyState,
 } from '@/components/admin/ui';
 
-function ExperienceContent() {
+/** Extract a 4-digit year from any ISO / YYYY-MM-DD date string. */
+function yr(d: string): number {
+  return new Date(d).getFullYear();
+}
+
+function EducationContent() {
   const { success, error: toastError } = useToast();
-  const [items, setItems] = useState<Experience[]>([]);
+  const [items, setItems] = useState<Education[]>([]);
   const [loading, setLoading] = useState(true);
-  const [deleteTarget, setDeleteTarget] = useState<Experience | null>(null);
+  const [deleteTarget, setDeleteTarget] = useState<Education | null>(null);
   const [deleting, setDeleting] = useState(false);
 
   useEffect(() => {
     setLoading(true);
-    adminExperience
+    adminEducation
       .list()
       .then((data) => setItems([...data].sort((a, b) => a.order - b.order)))
       .catch((err) => toastError(err instanceof Error ? err.message : 'Failed to load.'))
@@ -45,7 +49,7 @@ function ExperienceContent() {
     const reindexed = next.map((x, i) => ({ ...x, order: i }));
     setItems(reindexed);
     try {
-      await adminExperience.reorder(reindexed.map((x) => ({ id: x.id, order: x.order })));
+      await adminEducation.reorder(reindexed.map((x) => ({ id: x.id, order: x.order })));
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Reorder failed.');
     }
@@ -55,10 +59,10 @@ function ExperienceContent() {
     if (!deleteTarget) return;
     setDeleting(true);
     try {
-      await adminExperience.delete(deleteTarget.id);
+      await adminEducation.delete(deleteTarget.id);
       setItems((p) => p.filter((x) => x.id !== deleteTarget.id));
       setDeleteTarget(null);
-      success('Experience deleted.');
+      success('Education deleted.');
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Delete failed.');
     } finally {
@@ -68,12 +72,12 @@ function ExperienceContent() {
 
   return (
     <AdminShell
-      title="Experience"
-      description="Manage work experience entries."
+      title="Education"
+      description="Manage education entries (degrees, institutions)."
       actions={
-        <Link href="/admin/experience/new">
+        <Link href="/admin/education/new">
           <AdminButton>
-            <Plus size={14} aria-hidden="true" /> Add experience
+            <Plus size={14} aria-hidden="true" /> Add education
           </AdminButton>
         </Link>
       }
@@ -82,10 +86,10 @@ function ExperienceContent() {
         <LoadingRows />
       ) : items.length === 0 ? (
         <EmptyState
-          icon={<Briefcase size={20} />}
-          title="No experience entries yet"
+          icon={<GraduationCap size={20} />}
+          title="No education entries yet"
           action={
-            <Link href="/admin/experience/new">
+            <Link href="/admin/education/new">
               <AdminButton>
                 <Plus size={14} /> Add first entry
               </AdminButton>
@@ -123,38 +127,17 @@ function ExperienceContent() {
               {/* Content */}
               <div className="flex-1 min-w-0">
                 <p className="text-[14px] font-medium" style={{ color: 'var(--text)' }}>
-                  {item.role} — {item.company}
+                  {item.degree} — {item.school}
                 </p>
                 <p className="text-[12px] mt-0.5" style={{ color: 'var(--muted)' }}>
-                  {item.location} · {formatDate(item.startDate)} →{' '}
-                  {item.endDate ? formatDate(item.endDate) : 'Present'}
+                  {yr(item.startDate)} – {item.endDate ? yr(item.endDate) : 'Present'}
+                  {item.detail ? ` · ${item.detail}` : ''}
                 </p>
-                {item.bullets.length > 0 && (
-                  <ul className="mt-2 flex flex-col gap-0.5">
-                    {item.bullets.slice(0, 2).map((b, i) => (
-                      <li
-                        key={i}
-                        className="text-[12px] flex gap-1.5"
-                        style={{ color: 'var(--muted)' }}
-                      >
-                        <span aria-hidden="true" style={{ color: 'var(--accent)' }}>
-                          ·
-                        </span>
-                        {b}
-                      </li>
-                    ))}
-                    {item.bullets.length > 2 && (
-                      <li className="text-[11px]" style={{ color: 'var(--muted)' }}>
-                        +{item.bullets.length - 2} more
-                      </li>
-                    )}
-                  </ul>
-                )}
               </div>
 
               {/* Actions */}
               <div className="flex gap-1.5 shrink-0">
-                <Link href={`/admin/experience/${item.id}`}>
+                <Link href={`/admin/education/${item.id}`}>
                   <AdminButton variant="ghost" size="sm">
                     <Pencil size={13} aria-hidden="true" /> Edit
                   </AdminButton>
@@ -174,8 +157,8 @@ function ExperienceContent() {
 
       <ConfirmDialog
         open={!!deleteTarget}
-        title="Delete experience"
-        description={`Delete "${deleteTarget?.role} at ${deleteTarget?.company}"? This cannot be undone.`}
+        title="Delete education"
+        description={`Delete "${deleteTarget?.degree} — ${deleteTarget?.school}"? This cannot be undone.`}
         onConfirm={handleDelete}
         onCancel={() => setDeleteTarget(null)}
         loading={deleting}
@@ -184,10 +167,10 @@ function ExperienceContent() {
   );
 }
 
-export default function AdminExperiencePage() {
+export default function AdminEducationPage() {
   return (
     <ToastProvider>
-      <ExperienceContent />
+      <EducationContent />
     </ToastProvider>
   );
 }

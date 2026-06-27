@@ -21,8 +21,11 @@ export async function BlogTeaserSection({ data, sectionNumber }: BlogTeaserSecti
   let posts = await getBlogPosts();
   if (posts.length === 0) posts = FALLBACK_BLOG_POSTS;
 
-  const limit = data.limit ?? 3;
-  const latest = posts.slice(0, limit);
+  // Honor selection filter; default (mode absent or 'latest') = show by limit
+  const displayPosts =
+    data.mode === 'selected' && data.ids && data.ids.length > 0
+      ? (() => { const idSet = new Set(data.ids); return posts.filter((p) => idSet.has(p.id)); })()
+      : posts.slice(0, data.limit ?? 3);
 
   return (
     <section className="py-16" id="blog" aria-labelledby="blog-teaser-heading">
@@ -30,7 +33,7 @@ export async function BlogTeaserSection({ data, sectionNumber }: BlogTeaserSecti
         <SectionHeading number={sectionNumber} title={data.heading || 'Latest from the Blog'} />
 
         <div className="space-y-5">
-          {latest.map((post) => (
+          {displayPosts.map((post) => (
             <article
               key={post.id}
               className={[

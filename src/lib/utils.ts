@@ -10,9 +10,13 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-/** Format a date string to "Month YYYY". */
+/**
+ * Format a date string to "Mon YYYY".
+ * Accepts YYYY-MM-DD strings and full ISO datetime strings (e.g. from the backend).
+ * Returns the raw string unchanged for empty / unrecognised values.
+ */
 export function formatDate(dateStr: string): string {
-  if (!dateStr || dateStr === 'Present') return dateStr;
+  if (!dateStr) return dateStr;
   try {
     return new Date(dateStr).toLocaleDateString('en-US', {
       month: 'short',
@@ -33,22 +37,6 @@ export function formatBlogDate(dateStr: string): string {
     });
   } catch {
     return dateStr;
-  }
-}
-
-/**
- * Map ProofType to a human-readable label and the pill style.
- */
-export function proofLabel(proofType: string): string {
-  switch (proofType) {
-    case 'LIVE_DEMO':
-      return 'live demo';
-    case 'LIVE_LOGIN':
-      return 'live (login)';
-    case 'ARCHITECTURE':
-      return 'architecture';
-    default:
-      return '';
   }
 }
 

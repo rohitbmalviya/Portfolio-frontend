@@ -15,9 +15,14 @@ import type {
   Project,
   BlogPost,
   Skill,
+  SkillGroupSection,
   Experience,
+  Education,
   Achievement,
   SiteSettings,
+  NavPage,
+  ConfigOption,
+  Configuration,
 } from './types';
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -123,10 +128,27 @@ export async function getSkills(): Promise<Skill[]> {
   return result ?? [];
 }
 
+/**
+ * GET /api/skills/grouped — returns skills pre-grouped in canonical order
+ * (Languages → Frontend → Backend → Data → Cloud/DevOps → AI), empty groups omitted.
+ * Returns [] when the API is unreachable; callers should apply a local fallback.
+ */
+export async function getSkillsGrouped(): Promise<SkillGroupSection[]> {
+  const result = await apiFetch<SkillGroupSection[]>('/api/skills/grouped');
+  return result ?? [];
+}
+
 // ── Experience ────────────────────────────────────────────────
 
 export async function getExperience(): Promise<Experience[]> {
   const result = await apiFetch<Experience[]>('/api/experience');
+  return result ?? [];
+}
+
+// ── Education ──────────────────────────────────────────────────
+
+export async function getEducation(): Promise<Education[]> {
+  const result = await apiFetch<Education[]>('/api/education');
   return result ?? [];
 }
 
@@ -142,3 +164,38 @@ export async function getAchievements(): Promise<Achievement[]> {
 export async function getSiteSettings(): Promise<SiteSettings | null> {
   return apiFetch<SiteSettings>('/api/settings', 300); // cache 5 min
 }
+
+// ── Nav ───────────────────────────────────────────────────────
+
+/**
+ * GET /api/pages/nav (PUBLIC) — returns { slug, title, navLabel, navOrder }[]
+ * for pages where showInNav=true and published=true, ordered by navOrder.
+ * ISR-cached at 60 s. Returns [] if the API is unreachable so the
+ * caller can fall back to a static set.
+ */
+export async function getNav(): Promise<NavPage[]> {
+  const result = await apiFetch<NavPage[]>('/api/pages/nav', 60);
+  return result ?? [];
+}
+
+// ── Config options (public, no auth) ──────────────────────────
+
+/**
+ * GET /api/config/:key — returns the items array for a config key.
+ * Public endpoint (no auth). Returns [] on error or if API is unreachable.
+ * Intended for use in client components that need to populate dropdowns.
+ */
+export async function getConfigOptions(key: string): Promise<ConfigOption[]> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/config/${key}`, {
+      headers: { 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return [];
+    const envelope = (await res.json()) as ApiEnvelope<Configuration>;
+    return envelope.data?.items ?? [];
+  } catch {
+    return [];
+  }
+}
+
+export type { NavPage, ConfigOption, Configuration };

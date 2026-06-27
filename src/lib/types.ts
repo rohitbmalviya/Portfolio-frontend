@@ -31,8 +31,6 @@ export type SectionType =
   | 'CTA'
   | 'GALLERY';
 
-export type ProofType = 'LIVE_DEMO' | 'LIVE_LOGIN' | 'ARCHITECTURE' | 'NONE';
-
 export type SkillGroup =
   | 'LANGUAGES'
   | 'FRONTEND'
@@ -42,8 +40,6 @@ export type SkillGroup =
   | 'AI';
 
 export type SkillLevel = 'EXPERT' | 'PROFICIENT' | 'FAMILIAR';
-
-export type AchievementType = 'AWARD' | 'EDUCATION' | 'MENTORING';
 
 export type DefaultTheme = 'DARK' | 'LIGHT';
 
@@ -70,6 +66,8 @@ export interface Page {
   published: boolean;
   isSystem: boolean;
   sections: Section[];
+  /** Returned by GET /api/pages?admin=true instead of full sections array */
+  _count?: { sections: number };
   createdAt: string;
   updatedAt: string;
 }
@@ -120,19 +118,30 @@ export interface SkillInline {
 export interface SkillsData {
   heading: string;
   source?: 'skills-table';
-  groups?: SkillInline[];
+  mode?: 'all' | 'selected';
+  /** When mode === 'selected': selected individual skill IDs to include. */
+  ids?: string[];
+  /** @deprecated Legacy — when mode === 'selected': SkillGroup key names to include.
+   *  Kept for backward-compat; prefer ids. */
+  groups?: string[];
 }
 
 export interface ExperienceData {
   heading: string;
   source?: 'experience-table';
+  mode?: 'all' | 'selected';
+  ids?: string[];
 }
 
 export interface FeaturedProjectsData {
   heading: string;
+  /** Legacy field — kept for backward compat with existing seeded sections */
   projectIds?: string[];
+  /** New: selected project IDs when mode === 'selected' */
+  ids?: string[];
   auto?: 'featured';
   limit?: number;
+  mode?: 'all' | 'selected';
 }
 
 export interface ProjectsGridData {
@@ -144,11 +153,15 @@ export interface ProjectsGridData {
 export interface BlogTeaserData {
   heading: string;
   limit?: number;
+  mode?: 'latest' | 'selected';
+  ids?: string[];
 }
 
 export interface AchievementsData {
   heading: string;
   source?: 'achievements-table';
+  mode?: 'all' | 'selected';
+  ids?: string[];
 }
 
 export interface EducationItem {
@@ -160,15 +173,27 @@ export interface EducationItem {
 
 export interface EducationData {
   heading: string;
-  items: EducationItem[];
+  mode?: 'all' | 'selected';
+  ids?: string[];
+  /** Legacy inline items — kept optional for backward compat with old sections */
+  items?: EducationItem[];
+}
+
+export interface ContactLink {
+  type: string;
+  value: string;
 }
 
 export interface ContactData {
   heading: string;
   blurb: string;
   showForm: boolean;
-  email: string;
+  /** Legacy field — kept for backward-compat with existing seeded sections */
+  email?: string;
+  /** Legacy field — kept for backward-compat with existing seeded sections */
   socials?: Record<string, string>;
+  /** New dynamic links list (replaces fixed email + socials fields) */
+  links?: ContactLink[];
   resumeUrl?: string;
 }
 
@@ -222,10 +247,8 @@ export interface Project {
   tags: string[];
   stack: string[];
   metric: string;
-  proofType: ProofType;
   liveUrl?: string | null;
   screenshots: MediaItem[];
-  architectureImg?: string | null;
   overview: string;
   contribution: string;
   body: string;
@@ -263,6 +286,13 @@ export interface Skill {
   order: number;
 }
 
+/** Returned by GET /api/skills/grouped — one entry per non-empty group, in canonical order. */
+export interface SkillGroupSection {
+  group: SkillGroup;
+  label: string;
+  skills: Skill[];
+}
+
 // ── Experience ────────────────────────────────────────────────
 
 export interface Experience {
@@ -271,9 +301,23 @@ export interface Experience {
   company: string;
   location: string;
   startDate: string;
-  endDate: string;
+  endDate: string | null;
   bullets: string[];
   order: number;
+  /** Optional Cloudinary URL for the company logo */
+  logo?: string | null;
+}
+
+export interface Education {
+  id: string;
+  degree: string;
+  school: string;
+  startDate: string;
+  endDate: string | null;
+  detail?: string;
+  order: number;
+  /** Optional Cloudinary URL for the institution logo */
+  logo?: string | null;
 }
 
 // ── Achievement ───────────────────────────────────────────────
@@ -282,18 +326,16 @@ export interface Achievement {
   id: string;
   title: string;
   description: string;
-  year?: string | null;
-  type: AchievementType;
+  date: string | null;
+  image?: string | null;
   order: number;
 }
 
 // ── SiteSettings ──────────────────────────────────────────────
 
-export interface SocialLinks {
-  github?: string;
-  linkedin?: string;
-  twitter?: string;
-  [key: string]: string | undefined;
+export interface SocialLink {
+  type: string;
+  value: string;
 }
 
 export interface SiteSettings {
@@ -302,13 +344,39 @@ export interface SiteSettings {
   tagline: string;
   email: string;
   location: string;
-  socials: SocialLinks;
+  socials: SocialLink[];
   resumeUrl?: string | null;
   defaultTheme: DefaultTheme;
   brandAccent?: string | null;
   footerText?: string | null;
   ogTitle?: string | null;
   ogDescription?: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ── Nav page (public navbar) ──────────────────────────────────
+
+/** Shape returned by GET /api/pages/nav */
+export interface NavPage {
+  slug: string;
+  title: string;
+  navLabel?: string | null;
+  navOrder: number;
+}
+
+// ── Configuration ─────────────────────────────────────────────
+
+export interface ConfigOption {
+  value: string;
+  label: string;
+}
+
+export interface Configuration {
+  id: string;
+  key: string;
+  label: string;
+  items: ConfigOption[];
   createdAt: string;
   updatedAt: string;
 }

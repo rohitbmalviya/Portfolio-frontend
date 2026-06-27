@@ -8,7 +8,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Eye, EyeOff, Lock, Mail, Loader2 } from 'lucide-react';
+import { Eye, EyeOff, Lock, LogIn, Mail, Loader2 } from 'lucide-react';
 import { adminAuth } from '@/lib/admin-api';
 import { cn } from '@/lib/utils';
 
@@ -208,7 +208,10 @@ export default function AdminLoginPage() {
                 Signing in…
               </>
             ) : (
-              'Sign in'
+              <>
+                <LogIn size={16} aria-hidden="true" />
+                Sign in
+              </>
             )}
           </button>
         </form>
