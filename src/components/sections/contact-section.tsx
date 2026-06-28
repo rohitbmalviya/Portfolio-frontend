@@ -5,45 +5,26 @@
 
 import {
   Mail,
-  Github,
-  Linkedin,
-  Twitter,
   Download,
-  FileText,
   MapPin,
-  Phone,
-  Globe,
-  Instagram,
-  Youtube,
   ExternalLink,
 } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { LinkButton } from '@/components/ui/button';
 import { ContactForm } from './contact-form';
+import { CONTACT_LINK_ICON_MAP } from '@/lib/contact-link-types';
+import { getSiteSettings } from '@/lib/api';
 import type { ContactData } from '@/lib/types';
+import type { LucideIcon } from 'lucide-react';
 
-// ── Icon map for both legacy socials and new links ────────────
-
-type IconComponent = React.ComponentType<{ size?: number; 'aria-hidden'?: 'true' }>;
-
-const LINK_ICONS: Record<string, IconComponent> = {
-  email: Mail,
-  phone: Phone,
-  website: Globe,
-  linkedin: Linkedin,
-  github: Github,
-  twitter: Twitter,
-  instagram: Instagram,
-  youtube: Youtube,
-  resume: FileText,
-};
+// ── Legacy social icon map (backward-compat with data.socials) ─
 
 /** Kept for backward-compat with legacy `data.socials` key names */
-const LEGACY_SOCIAL_ICONS: Record<string, IconComponent> = {
-  github: Github,
-  linkedin: Linkedin,
-  twitter: Twitter,
-  email: Mail,
+const LEGACY_SOCIAL_ICONS: Record<string, LucideIcon> = {
+  github:   CONTACT_LINK_ICON_MAP['github']   ?? ExternalLink,
+  linkedin: CONTACT_LINK_ICON_MAP['linkedin'] ?? ExternalLink,
+  twitter:  CONTACT_LINK_ICON_MAP['twitter']  ?? ExternalLink,
+  email:    Mail,
 };
 
 function getLinkHref(type: string, value: string): string {
@@ -63,7 +44,11 @@ interface ContactSectionProps {
   sectionNumber?: string;
 }
 
-export function ContactSection({ data, sectionNumber }: ContactSectionProps) {
+export async function ContactSection({ data, sectionNumber }: ContactSectionProps) {
+  // Fetch settings to resolve location — cached at 5 min (ISR).
+  const settings = await getSiteSettings();
+  const location = settings?.location ?? 'Pune, India';
+
   // Derive the primary email: prefer a link of type 'email', then legacy
   // data.email, then env var, then hardcoded fallback.
   const emailLink = data.links?.find((l) => l.type === 'email');
@@ -122,17 +107,17 @@ export function ContactSection({ data, sectionNumber }: ContactSectionProps) {
             )}
           </div>
 
-          {/* Location */}
+          {/* Location — sourced from SiteSettings, falls back to literal */}
           <p className="flex items-center gap-2 font-mono text-[13px] text-[--muted]">
             <MapPin size={14} aria-hidden="true" />
-            Pune, India
+            {location}
           </p>
 
           {/* Links row — new dynamic list if present, legacy socials otherwise */}
           {hasNewLinks && nonEmailLinks.length > 0 ? (
             <div className="flex flex-wrap items-center gap-5">
               {nonEmailLinks.map((link, i) => {
-                const Icon: IconComponent = LINK_ICONS[link.type] ?? ExternalLink;
+                const Icon: LucideIcon = CONTACT_LINK_ICON_MAP[link.type] ?? ExternalLink;
                 const href = getLinkHref(link.type, link.value);
                 const external = isExternalHref(link.type);
                 // Show the raw value for phone, friendly label for resume, type name for URLs
@@ -160,7 +145,7 @@ export function ContactSection({ data, sectionNumber }: ContactSectionProps) {
             <div className="flex items-center gap-5">
               {Object.entries(data.socials).map(([key, href]) => {
                 if (!href) return null;
-                const Icon: IconComponent =
+                const Icon: LucideIcon =
                   LEGACY_SOCIAL_ICONS[key.toLowerCase()] ?? Mail;
                 return (
                   <a

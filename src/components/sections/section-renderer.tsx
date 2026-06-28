@@ -44,17 +44,17 @@ export async function SectionRenderer({ sections }: SectionRendererProps) {
     .filter((s) => s.enabled)
     .sort((a, b) => a.order - b.order);
 
-  // Number only "heading" sections (skip HERO, METRICS)
-  const NUMBERED: SectionType[] = [
-    'ABOUT', 'SKILLS', 'EXPERIENCE', 'FEATURED_PROJECTS',
-    'PROJECTS_GRID', 'BLOG_TEASER', 'ACHIEVEMENTS', 'EDUCATION', 'CONTACT',
-  ];
+  // Sections that do NOT receive a sequential number prefix.
+  // Everything else (ABOUT, SKILLS, EXPERIENCE, …) is numbered.
+  const NON_NUMBERED_SECTIONS = new Set<SectionType>([
+    'HERO', 'METRICS', 'RICH_TEXT', 'CTA', 'GALLERY',
+  ]);
   let numberedCount = 0;
 
   return (
     <>
       {enabled.map((section) => {
-        const isNumbered = NUMBERED.includes(section.type);
+        const isNumbered = !NON_NUMBERED_SECTIONS.has(section.type);
         const num = isNumbered ? sectionNumber(numberedCount++) : undefined;
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const data = section.data as any;

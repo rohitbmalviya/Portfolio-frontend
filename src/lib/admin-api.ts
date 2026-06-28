@@ -471,11 +471,19 @@ export const adminSettings = {
 export const adminMedia = {
   list: () => adminFetch<MediaRecord[]>('/api/media'),
 
-  upload: (file: File, alt?: string, category?: string) => {
+  upload: (
+    file: File,
+    alt?: string,
+    category?: string,
+    entitySlug?: string,
+    sequence?: number,
+  ) => {
     const fd = new FormData();
     fd.append('file', file);
     if (alt) fd.append('alt', alt);
     if (category) fd.append('category', category);
+    if (entitySlug) fd.append('entitySlug', entitySlug);
+    if (sequence !== undefined) fd.append('sequence', String(sequence));
     return adminUpload<MediaRecord>('/api/media', fd);
   },
 

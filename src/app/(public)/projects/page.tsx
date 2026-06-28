@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { getProjects } from '@/lib/api';
 import { FALLBACK_PROJECTS } from '@/lib/fallback-data';
 import { ProjectCard } from '@/components/sections/project-card';
+import { SITE_OWNER } from '@/lib/site';
 
 export const revalidate = 60;
 
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
   description:
     'All 8 production projects — from a bank-grade Monte Carlo engine for Siam Commercial Bank to a multi-tenant AI hiring SaaS.',
   openGraph: {
-    title: 'Projects — Rohit Malviya',
+    title: `Projects — ${SITE_OWNER}`,
     description: 'Production-grade systems across fintech, hiring, real-estate & AI.',
   },
 };

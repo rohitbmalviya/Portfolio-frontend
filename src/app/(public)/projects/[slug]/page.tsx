@@ -17,6 +17,7 @@ import { getProject, getProjects } from '@/lib/api';
 import { FALLBACK_PROJECTS } from '@/lib/fallback-data';
 import { Tag } from '@/components/ui/tag';
 import { LinkButton } from '@/components/ui/button';
+import { SITE_OWNER } from '@/lib/site';
 
 export const revalidate = 60;
 
@@ -38,7 +39,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: project.title,
     description: project.oneLiner,
     openGraph: {
-      title: `${project.title} — Rohit Malviya`,
+      title: `${project.title} — ${SITE_OWNER}`,
       description: project.oneLiner,
       images: project.screenshots[0]
         ? [{ url: project.screenshots[0].url, alt: project.screenshots[0].alt || project.title }]

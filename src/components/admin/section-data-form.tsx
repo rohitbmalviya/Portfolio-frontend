@@ -18,6 +18,7 @@ import {
 } from '@/lib/admin-api';
 import { getConfigOptions } from '@/lib/api';
 import type { ConfigOption } from '@/lib/api';
+import { CONTACT_LINK_TYPE_OPTIONS } from '@/lib/contact-link-types';
 import Link from 'next/link';
 import {
   AdminInput,
@@ -120,10 +121,10 @@ function HeroForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData)
                     next[i] = { ...btn, style: e.target.value };
                     field(data, onChange, 'buttons', next);
                   }}
-                  options={[
-                    { value: 'primary', label: 'Primary' },
-                    { value: 'ghost', label: 'Ghost' },
-                  ]}
+                  options={(['primary', 'ghost'] as const).map((v) => ({
+                    value: v,
+                    label: v.charAt(0).toUpperCase() + v.slice(1),
+                  }))}
                 />
               </div>
               <AdminButton
@@ -916,24 +917,9 @@ function EducationForm({ data, onChange }: { data: AnyObj; onChange: (d: Section
   );
 }
 
-const LINK_TYPE_OPTIONS: ConfigOption[] = [
-  { value: 'email', label: 'Email' },
-  { value: 'phone', label: 'Phone' },
-  { value: 'website', label: 'Website' },
-  { value: 'linkedin', label: 'LinkedIn' },
-  { value: 'github', label: 'GitHub' },
-  { value: 'twitter', label: 'X (Twitter)' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'youtube', label: 'YouTube' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'dribbble', label: 'Dribbble' },
-  { value: 'telegram', label: 'Telegram' },
-  { value: 'resume', label: 'Resume / CV' },
-];
-
 function ContactForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
   const links: { type: string; value: string }[] = data.links ?? [];
-  const [linkTypeOptions, setLinkTypeOptions] = useState<ConfigOption[]>(LINK_TYPE_OPTIONS);
+  const [linkTypeOptions, setLinkTypeOptions] = useState<ConfigOption[]>(CONTACT_LINK_TYPE_OPTIONS);
 
   useEffect(() => {
     getConfigOptions('contact_link_types').then((opts) => {

@@ -14,30 +14,8 @@ import { SectionHeading } from '@/components/ui/section-heading';
 import { SkillIcon } from '@/components/ui/skill-icon';
 import { getSkillsGrouped } from '@/lib/api';
 import { FALLBACK_SKILLS } from '@/lib/fallback-data';
-import type { SkillsData, Skill, SkillGroup, SkillGroupSection } from '@/lib/types';
-
-// ── Offline fallback helpers ──────────────────────────────────
-// Used ONLY when getSkillsGrouped() returns [].
-// Mirrors the canonical order the backend uses so the fallback
-// rendering is consistent with the live API.
-
-const CANONICAL_ORDER: SkillGroup[] = [
-  'LANGUAGES',
-  'FRONTEND',
-  'BACKEND',
-  'DATA',
-  'CLOUD_DEVOPS',
-  'AI',
-];
-
-const CANONICAL_LABELS: Record<SkillGroup, string> = {
-  LANGUAGES: 'Languages',
-  FRONTEND: 'Frontend',
-  BACKEND: 'Backend',
-  DATA: 'Data',
-  CLOUD_DEVOPS: 'Cloud / DevOps',
-  AI: 'AI',
-};
+import { SKILL_GROUP_ORDER, SKILL_GROUP_LABELS } from '@/lib/skill-groups';
+import type { SkillsData, Skill, SkillGroupSection } from '@/lib/types';
 
 /** Shape FALLBACK_SKILLS into the same SkillGroupSection[] the API would return. */
 function groupFallbackSkills(skills: Skill[]): SkillGroupSection[] {
@@ -45,11 +23,11 @@ function groupFallbackSkills(skills: Skill[]): SkillGroupSection[] {
   for (const s of skills) {
     (map[s.group] ??= []).push(s);
   }
-  return CANONICAL_ORDER
+  return SKILL_GROUP_ORDER
     .filter((g) => (map[g]?.length ?? 0) > 0)
     .map((g) => ({
       group: g,
-      label: CANONICAL_LABELS[g],
+      label: SKILL_GROUP_LABELS[g],
       skills: (map[g] ?? []).sort((a, b) => a.order - b.order),
     }));
 }

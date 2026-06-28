@@ -18,6 +18,7 @@ import { FALLBACK_BLOG_POSTS } from '@/lib/fallback-data';
 import { Tag } from '@/components/ui/tag';
 import { ScreenshotLightbox, LightboxTrigger, LightboxImg } from '@/components/projects/screenshot-lightbox';
 import { formatBlogDate, readingTimeLabel } from '@/lib/utils';
+import { SITE_OWNER } from '@/lib/site';
 
 export const revalidate = 60;
 
@@ -39,7 +40,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     title: post.title,
     description: post.excerpt,
     openGraph: {
-      title: `${post.title} — Rohit Malviya`,
+      title: `${post.title} — ${SITE_OWNER}`,
       description: post.excerpt,
       type: 'article',
       publishedTime: post.publishedAt ?? undefined,

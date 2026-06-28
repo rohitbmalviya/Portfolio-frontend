@@ -66,7 +66,7 @@ export function ScreenshotLightbox({
       {current && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-6"
-          style={{ backgroundColor: 'rgba(0,0,0,0.9)' }}
+          style={{ backgroundColor: 'var(--overlay-scrim)' }}
           onClick={close}
           role="dialog"
           aria-modal="true"
@@ -86,7 +86,7 @@ export function ScreenshotLightbox({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); prev(); }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full grid place-items-center text-white"
-                style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                style={{ backgroundColor: 'var(--overlay-btn)' }}
                 aria-label="Previous image"
               >
                 <ChevronLeft size={22} aria-hidden="true" />
@@ -95,14 +95,14 @@ export function ScreenshotLightbox({
                 type="button"
                 onClick={(e) => { e.stopPropagation(); next(); }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full grid place-items-center text-white"
-                style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                style={{ backgroundColor: 'var(--overlay-btn)' }}
                 aria-label="Next image"
               >
                 <ChevronRight size={22} aria-hidden="true" />
               </button>
               <div
                 className="absolute bottom-5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[12px] text-white"
-                style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+                style={{ backgroundColor: 'var(--overlay-btn)' }}
               >
                 {index! + 1} / {screenshots.length}
               </div>
@@ -113,7 +113,7 @@ export function ScreenshotLightbox({
             type="button"
             onClick={close}
             className="absolute top-4 right-4 w-10 h-10 rounded-full grid place-items-center text-white"
-            style={{ backgroundColor: 'rgba(0,0,0,0.6)' }}
+            style={{ backgroundColor: 'var(--overlay-btn)' }}
             aria-label="Close preview"
           >
             <X size={20} aria-hidden="true" />

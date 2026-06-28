@@ -15,6 +15,7 @@ import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
+import { SITE_OWNER } from '@/lib/site';
 import type { NavPage } from '@/lib/types';
 
 // ── Static fallback ───────────────────────────────────────────
@@ -72,7 +73,7 @@ export function Nav({ navItems }: NavProps) {
         <Link
           href="/"
           className="font-mono font-medium tracking-[0.5px] text-[--text] hover:text-[--text] focus-visible:outline-[--accent]"
-          aria-label="Rohit Malviya — home"
+          aria-label={`${SITE_OWNER} — home`}
         >
           rohit<span className="text-[--accent]">.</span>malviya
         </Link>

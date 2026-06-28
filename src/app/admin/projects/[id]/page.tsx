@@ -239,6 +239,7 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
             category={MediaCategory.Projects}
             value={form.screenshots as Array<{ url: string; alt: string }>}
             onChange={(items) => set('screenshots', items)}
+            entitySlug={form.slug}
           />
         </AdminCard>
 

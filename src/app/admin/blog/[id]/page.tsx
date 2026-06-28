@@ -180,6 +180,7 @@ function BlogFormContent({ postId }: { postId: string | null }) {
             value={form.coverImage ?? null}
             onChange={(url) => set('coverImage', url ?? '')}
             hint="Recommended: 1200×630px"
+            entitySlug={form.slug}
           />
         </AdminCard>
 

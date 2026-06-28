@@ -21,6 +21,8 @@ interface ImageUploadProps {
   accept?: string;
   /** Routes the upload to a Cloudinary subfolder + Media category. Defaults to Raw. */
   category?: MediaCategory;
+  /** Required when category is Projects or Blogs — used as the Cloudinary folder slug. */
+  entitySlug?: string;
 }
 
 export function ImageUpload({
@@ -30,6 +32,7 @@ export function ImageUpload({
   hint,
   accept = 'image/*',
   category,
+  entitySlug,
 }: ImageUploadProps) {
   const { error: toastError } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -39,9 +42,17 @@ export function ImageUpload({
 
   const upload = useCallback(
     async (file: File) => {
+      // Projects and Blogs must have a slug so Cloudinary can file the image correctly.
+      if (
+        (category === MediaCategory.Projects || category === MediaCategory.Blogs) &&
+        !entitySlug?.trim()
+      ) {
+        toastError('Name/save this first so the image can be filed under it.');
+        return;
+      }
       setUploading(true);
       try {
-        const media = await adminMedia.upload(file, file.name, category);
+        const media = await adminMedia.upload(file, file.name, category, entitySlug, 1);
         onChange(media.cloudinaryUrl);
       } catch (err) {
         toastError(
@@ -51,7 +62,7 @@ export function ImageUpload({
         setUploading(false);
       }
     },
-    [onChange, toastError, category],
+    [onChange, toastError, category, entitySlug],
   );
 
   function handleFile(files: FileList | null) {
@@ -87,7 +98,7 @@ export function ImageUpload({
             type="button"
             onClick={() => onChange(null)}
             className="absolute top-2 right-2 w-7 h-7 rounded-full grid place-items-center transition-colors"
-            style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+            style={{ backgroundColor: 'var(--overlay-btn)', color: '#fff' }}
             aria-label="Remove image"
           >
             <X size={14} aria-hidden="true" />
@@ -165,7 +176,7 @@ export function ImageUpload({
       {zoomed && value && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-6"
-          style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}
+          style={{ backgroundColor: 'var(--overlay-scrim)' }}
           onClick={() => setZoomed(false)}
           role="dialog"
           aria-modal="true"
@@ -182,7 +193,7 @@ export function ImageUpload({
             type="button"
             onClick={() => setZoomed(false)}
             className="absolute top-4 right-4 w-9 h-9 rounded-full grid place-items-center"
-            style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+            style={{ backgroundColor: 'var(--overlay-btn)', color: '#fff' }}
             aria-label="Close preview"
           >
             <X size={18} aria-hidden="true" />
@@ -204,9 +215,11 @@ interface MultiImageUploadProps {
   label?: string;
   /** Routes uploads to a Cloudinary subfolder + Media category. Defaults to Raw. */
   category?: MediaCategory;
+  /** Required when category is Projects or Blogs — used as the Cloudinary folder slug. */
+  entitySlug?: string;
 }
 
-export function MultiImageUpload({ value, onChange, label, category }: MultiImageUploadProps) {
+export function MultiImageUpload({ value, onChange, label, category, entitySlug }: MultiImageUploadProps) {
   const { error: toastError } = useToast();
   const [uploading, setUploading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -234,10 +247,30 @@ export function MultiImageUpload({ value, onChange, label, category }: MultiImag
   }, [lightboxIndex, closeLightbox, showPrev, showNext]);
 
   async function uploadFiles(files: FileList) {
+    // Projects and Blogs must have a slug so Cloudinary can file images correctly.
+    if (
+      (category === MediaCategory.Projects || category === MediaCategory.Blogs) &&
+      !entitySlug?.trim()
+    ) {
+      toastError('Name/save this first so the image can be filed under it.');
+      return;
+    }
+
     setUploading(true);
     try {
+      // Compute the highest sequence number already present in existing URLs
+      // (matches patterns like "project-image-3" or "blog-image-7").
+      const seqRegex = /-image-(\d+)/;
+      const maxSeq = value.reduce<number>((max, item) => {
+        const m = seqRegex.exec(item.url);
+        return m ? Math.max(max, Number(m[1])) : max;
+      }, 0);
+
+      const fileArray = Array.from(files);
       const results = await Promise.all(
-        Array.from(files).map((f) => adminMedia.upload(f, f.name, category)),
+        fileArray.map((f, i) =>
+          adminMedia.upload(f, f.name, category, entitySlug, maxSeq + 1 + i),
+        ),
       );
       const newItems: MediaItem[] = results.map((r) => ({
         url: r.cloudinaryUrl,
@@ -293,7 +326,7 @@ export function MultiImageUpload({ value, onChange, label, category }: MultiImag
                   type="button"
                   onClick={(e) => { e.stopPropagation(); removeItem(i); }}
                   className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full grid place-items-center"
-                  style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+                  style={{ backgroundColor: 'var(--overlay-btn)', color: '#fff' }}
                   aria-label={`Remove screenshot ${i + 1}`}
                 >
                   <X size={12} aria-hidden="true" />
@@ -363,7 +396,7 @@ export function MultiImageUpload({ value, onChange, label, category }: MultiImag
       {lightboxIndex !== null && value[lightboxIndex] && (
         <div
           className="fixed inset-0 z-[100] flex items-center justify-center p-6"
-          style={{ backgroundColor: 'rgba(0,0,0,0.88)' }}
+          style={{ backgroundColor: 'var(--overlay-scrim)' }}
           onClick={closeLightbox}
           role="dialog"
           aria-modal="true"
@@ -383,7 +416,7 @@ export function MultiImageUpload({ value, onChange, label, category }: MultiImag
                 type="button"
                 onClick={(e) => { e.stopPropagation(); showPrev(); }}
                 className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full grid place-items-center"
-                style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+                style={{ backgroundColor: 'var(--overlay-btn)', color: '#fff' }}
                 aria-label="Previous image"
               >
                 <ChevronLeft size={22} aria-hidden="true" />
@@ -392,14 +425,14 @@ export function MultiImageUpload({ value, onChange, label, category }: MultiImag
                 type="button"
                 onClick={(e) => { e.stopPropagation(); showNext(); }}
                 className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 rounded-full grid place-items-center"
-                style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+                style={{ backgroundColor: 'var(--overlay-btn)', color: '#fff' }}
                 aria-label="Next image"
               >
                 <ChevronRight size={22} aria-hidden="true" />
               </button>
               <div
                 className="absolute bottom-5 left-1/2 -translate-x-1/2 px-3 py-1 rounded-full text-[12px]"
-                style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+                style={{ backgroundColor: 'var(--overlay-btn)', color: '#fff' }}
               >
                 {lightboxIndex + 1} / {value.length}
               </div>
@@ -410,7 +443,7 @@ export function MultiImageUpload({ value, onChange, label, category }: MultiImag
             type="button"
             onClick={closeLightbox}
             className="absolute top-4 right-4 w-9 h-9 rounded-full grid place-items-center"
-            style={{ backgroundColor: 'rgba(0,0,0,0.7)', color: '#fff' }}
+            style={{ backgroundColor: 'var(--overlay-btn)', color: '#fff' }}
             aria-label="Close preview"
           >
             <X size={18} aria-hidden="true" />

@@ -7,6 +7,7 @@
 import type { Metadata, Viewport } from 'next';
 import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/components/ui/theme-provider';
+import { SITE_OWNER, SITE_TITLE, SITE_TITLE_TEMPLATE } from '@/lib/site';
 import './globals.css';
 
 // ── Fonts via next/font (self-hosted subset, no external request) ──
@@ -39,19 +40,19 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://rohitmalviya.dev';
 export const metadata: Metadata = {
   metadataBase: new URL(SITE_URL),
   title: {
-    default: 'Rohit Malviya — Full-Stack Engineer',
-    template: '%s — Rohit Malviya',
+    default: SITE_TITLE,
+    template: SITE_TITLE_TEMPLATE,
   },
   description:
     'Full-stack engineer (2+ yrs) building production SaaS & bank-grade systems across TypeScript, Go, Python & Java. Architected a Monte Carlo platform for Siam Commercial Bank.',
-  authors: [{ name: 'Rohit Malviya', url: SITE_URL }],
-  creator: 'Rohit Malviya',
+  authors: [{ name: SITE_OWNER, url: SITE_URL }],
+  creator: SITE_OWNER,
   openGraph: {
     type: 'website',
     locale: 'en_US',
     url: SITE_URL,
-    siteName: 'Rohit Malviya',
-    title: 'Rohit Malviya — Full-Stack Engineer',
+    siteName: SITE_OWNER,
+    title: SITE_TITLE,
     description:
       'Full-stack engineer building production SaaS & bank-grade systems across TypeScript, Go, Python & Java.',
     images: [
@@ -59,13 +60,13 @@ export const metadata: Metadata = {
         url: '/og-default.png',
         width: 1200,
         height: 630,
-        alt: 'Rohit Malviya — Full-Stack Engineer',
+        alt: SITE_TITLE,
       },
     ],
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'Rohit Malviya — Full-Stack Engineer',
+    title: SITE_TITLE,
     description: 'Full-stack engineer building production SaaS & bank-grade systems.',
     images: ['/og-default.png'],
   },
@@ -92,6 +93,8 @@ export const metadata: Metadata = {
 
 export const viewport: Viewport = {
   themeColor: [
+    // These hex values mirror --bg in globals.css (dark: #0B0F17, light: #F2F5FA).
+    // If --bg changes, update these to match.
     { media: '(prefers-color-scheme: dark)', color: '#0B0F17' },
     { media: '(prefers-color-scheme: light)', color: '#F2F5FA' },
   ],

@@ -27,6 +27,11 @@
   --thumb-to: #16203A;
   --nav-bg: rgba(11, 15, 23, 0.7);
   --card-shadow: 0 14px 40px rgba(0, 0, 0, 0.45);
+  /* Syntax highlighting tokens */
+  --syntax-string:   #86EFAC;
+  --syntax-number:   #F97316;
+  --syntax-function: #818CF8;
+  --syntax-variable: #FCD34D;
 }
 
 :root[data-theme="light"] {
@@ -46,6 +51,19 @@
   --thumb-to: #DBE6F4;
   --nav-bg: rgba(242, 245, 250, 0.82);
   --card-shadow: 0 16px 40px rgba(15, 23, 42, 0.10);
+  /* Syntax highlighting tokens */
+  --syntax-string:   #166534;
+  --syntax-number:   #9A3412;
+  --syntax-function: #4338CA;
+  --syntax-variable: #854D0E;
+}
+
+/* ── GLOBAL (THEME-INDEPENDENT) TOKENS ────────────────────── */
+
+:root {
+  /* Lightbox overlay — theme-independent dark scrims */
+  --overlay-scrim: rgba(0, 0, 0, 0.88); /* full backdrop */
+  --overlay-btn:   rgba(0, 0, 0, 0.70); /* nav / close buttons */
 }
 
 /* ── RESET & BASE ──────────────────────────────────────────── */
@@ -244,7 +262,13 @@ code {
   font-weight: 600;
 }
 
-/* ── HIGHLIGHT.JS THEME (dark-friendly) ────────────────────── */
+/* ── HIGHLIGHT.JS THEME (design-token driven) ───────────────── */
+/*
+   Colors are driven by theme-switching CSS vars defined above:
+   --accent handles keywords (cyan in dark, teal in light).
+   --syntax-string / number / function / variable switch automatically.
+   No per-theme selector overrides needed.
+*/
 
 .hljs {
   background: transparent !important;
@@ -253,28 +277,16 @@ code {
 
 .hljs-keyword,
 .hljs-selector-tag,
-.hljs-built_in { color: #22D3EE; }
+.hljs-built_in { color: var(--accent); }
 .hljs-string,
-.hljs-attr { color: #86EFAC; }
+.hljs-attr { color: var(--syntax-string); }
 .hljs-number,
-.hljs-literal { color: #F97316; }
+.hljs-literal { color: var(--syntax-number); }
 .hljs-comment { color: var(--muted); font-style: italic; }
 .hljs-function,
-.hljs-title { color: #818CF8; }
+.hljs-title { color: var(--syntax-function); }
 .hljs-variable,
-.hljs-params { color: #FCD34D; }
-
-:root[data-theme="light"] .hljs-keyword,
-:root[data-theme="light"] .hljs-selector-tag,
-:root[data-theme="light"] .hljs-built_in { color: #0E7490; }
-:root[data-theme="light"] .hljs-string,
-:root[data-theme="light"] .hljs-attr { color: #166534; }
-:root[data-theme="light"] .hljs-number,
-:root[data-theme="light"] .hljs-literal { color: #9A3412; }
-:root[data-theme="light"] .hljs-function,
-:root[data-theme="light"] .hljs-title { color: #4338CA; }
-:root[data-theme="light"] .hljs-variable,
-:root[data-theme="light"] .hljs-params { color: #854D0E; }
+.hljs-params { color: var(--syntax-variable); }
 
 /* ── REACT-DAY-PICKER THEME (.dp-popover wrapper) ──────────── */
 /*

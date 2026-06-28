@@ -11,14 +11,15 @@
 import { Nav } from '@/components/layout/nav';
 import { Footer } from '@/components/layout/footer';
 import { ParticlesBackground } from '@/components/layout/particles-background';
-import { getNav } from '@/lib/api';
+import { getNav, getSiteSettings } from '@/lib/api';
 
 export default async function PublicLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
-  const navItems = await getNav();
+  // Fetch in parallel — settings are ISR-cached at 5 min so this is cheap.
+  const [navItems, settings] = await Promise.all([getNav(), getSiteSettings()]);
 
   return (
     <>
@@ -31,7 +32,7 @@ export default async function PublicLayout({
         <main id="main-content" tabIndex={-1}>
           {children}
         </main>
-        <Footer />
+        <Footer settings={settings} />
       </div>
     </>
   );

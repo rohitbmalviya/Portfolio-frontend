@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import { getBlogPosts } from '@/lib/api';
 import { FALLBACK_BLOG_POSTS } from '@/lib/fallback-data';
 import { BlogCard } from '@/components/sections/blog-card';
+import { SITE_OWNER } from '@/lib/site';
 
 export const revalidate = 60;
 
@@ -15,7 +16,7 @@ export const metadata: Metadata = {
   description:
     'Technical writing on production systems, architecture, fintech engineering, and full-stack development.',
   openGraph: {
-    title: 'Blog — Rohit Malviya',
+    title: `Blog — ${SITE_OWNER}`,
     description:
       'Deep dives on production systems, Monte Carlo engines, multi-tenant SaaS, and more.',
   },

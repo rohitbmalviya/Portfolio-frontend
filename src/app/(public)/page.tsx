@@ -9,11 +9,12 @@
 import type { Metadata } from 'next';
 import { getPage } from '@/lib/api';
 import { SectionRenderer } from '@/components/sections/section-renderer';
+import { SITE_TITLE } from '@/lib/site';
 
 export const revalidate = 60;
 
 export const metadata: Metadata = {
-  title: 'Rohit Malviya — Full-Stack Engineer',
+  title: SITE_TITLE,
   description:
     'Full-stack engineer (2+ yrs) building production SaaS & bank-grade systems across TypeScript, Go, Python & Java. Architected a Monte Carlo platform for Siam Commercial Bank.',
 };

@@ -27,6 +27,9 @@ import type {
 
 const BASE_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
 
+/** ISR revalidation window for site settings (seconds). */
+const SETTINGS_CACHE_SECONDS = 300;
+
 // ── Low-level fetch helper ────────────────────────────────────
 
 // All backend responses are wrapped: { data: T }
@@ -181,7 +184,7 @@ export async function getAchievements(): Promise<Achievement[]> {
 // ── Site Settings ─────────────────────────────────────────────
 
 export async function getSiteSettings(): Promise<SiteSettings | null> {
-  return apiFetch<SiteSettings>('/api/settings', 300); // cache 5 min
+  return apiFetch<SiteSettings>('/api/settings', SETTINGS_CACHE_SECONDS);
 }
 
 // ── Nav ───────────────────────────────────────────────────────
