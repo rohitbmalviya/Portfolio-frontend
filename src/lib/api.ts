@@ -34,31 +34,55 @@ interface ApiEnvelope<T> {
   data: T;
 }
 
+const FETCH_TIMEOUT_MS = 8000;
+const MAX_ATTEMPTS = 2; // initial try + 1 retry on transient failures
+
+const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 async function apiFetch<T>(
   path: string,
   revalidate = 60,
 ): Promise<T | null> {
-  try {
-    const res = await fetch(`${BASE_URL}${path}`, {
-      next: { revalidate },
-      headers: { 'Content-Type': 'application/json' },
-    });
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    // Abort the request if the backend hangs past the timeout.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
 
-    if (!res.ok) {
-      // 404 is a normal "not found" — return null, don't log noisily
-      if (res.status === 404) return null;
-      console.error(`[api] ${path} → HTTP ${res.status}`);
+    try {
+      const res = await fetch(`${BASE_URL}${path}`, {
+        next: { revalidate },
+        headers: { 'Content-Type': 'application/json' },
+        signal: controller.signal,
+      });
+      clearTimeout(timer);
+
+      if (!res.ok) {
+        // 404 is a normal "not found" — return null, don't log/retry.
+        if (res.status === 404) return null;
+        // Retry once on transient 5xx, otherwise give up gracefully.
+        if (res.status >= 500 && attempt < MAX_ATTEMPTS) {
+          await delay(300 * attempt);
+          continue;
+        }
+        console.error(`[api] ${path} → HTTP ${res.status}`);
+        return null;
+      }
+
+      // Unwrap { data: T } envelope returned by every backend controller
+      const envelope = (await res.json()) as ApiEnvelope<T>;
+      return envelope.data;
+    } catch (err) {
+      clearTimeout(timer);
+      // Network failure or timeout (abort) — retry once, then give up.
+      if (attempt < MAX_ATTEMPTS) {
+        await delay(300 * attempt);
+        continue;
+      }
+      console.warn(`[api] fetch failed for ${path}:`, (err as Error).message);
       return null;
     }
-
-    // Unwrap { data: T } envelope returned by every backend controller
-    const envelope = (await res.json()) as ApiEnvelope<T>;
-    return envelope.data;
-  } catch (err) {
-    // API is unreachable at build time or runtime — return null gracefully
-    console.warn(`[api] fetch failed for ${path}:`, (err as Error).message);
-    return null;
   }
+  return null;
 }
 
 // ── Pages ─────────────────────────────────────────────────────

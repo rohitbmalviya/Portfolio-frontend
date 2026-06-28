@@ -1,23 +1,42 @@
 'use client';
 
 // ============================================================
-//  SkillIcon — DYNAMIC Simple Icons via the official CDN.
-//  No hardcoded map, no manual slug — the slug is derived
-//  straight from the skill `name` (skillSlug).
-//  Renders https://cdn.simpleicons.org/<slug>. If the brand
-//  isn't in Simple Icons, the request 404s → we hide it (no icon).
-//  Brand-colored (CDN default).
+//  SkillIcon — DYNAMIC Simple Icons, fetched + inlined.
+//  The slug is derived from the skill `name` (skillSlug), then
+//  fetched from https://cdn.simpleicons.org/<slug> and inlined.
+//
+//  Why fetch instead of <img>? An <img> pointing at a missing
+//  slug logs a red "GET … 404" to the console for every brand
+//  Simple Icons doesn't have. fetch() reads the 404 status
+//  silently (no console error), so unmatched skills render
+//  nothing — cleanly. The CDN sends `access-control-allow-origin: *`,
+//  so the cross-origin fetch is allowed.
 // ============================================================
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+// Derived-slug → actual Simple Icons slug, where a naive derivation
+// doesn't match the real brand slug. Keyed by the output of the
+// base derivation below.
+const SLUG_ALIASES: Record<string, string> = {
+  gemini: 'googlegemini',
+  gcp: 'googlecloud',
+  angular1819: 'angular',
+  angular18: 'angular',
+  angular19: 'angular',
+  gingo: 'gin',
+  nodedotjsexpress: 'nodedotjs',
+  langchainlanggraph: 'langchain',
+};
 
 /**
  * Approximates Simple Icons' title→slug rules so a typed tech name
  * resolves to its CDN slug (e.g. "Next.js" → "nextdotjs",
- * "C++" → "cplusplus", ".NET" → "dotnet", "Tailwind CSS" → "tailwindcss").
+ * "C++" → "cplusplus", ".NET" → "dotnet", "Tailwind CSS" → "tailwindcss"),
+ * then applies known aliases for brands whose slug differs.
  */
 export function skillSlug(name: string): string {
-  return name
+  const base = name
     .trim()
     .toLowerCase()
     .replace(/\+/g, 'plus')
@@ -27,7 +46,12 @@ export function skillSlug(name: string): string {
     .normalize('NFD')
     .replace(/[̀-ͯ]/g, '') // strip diacritics
     .replace(/[^a-z0-9]/g, ''); // drop anything else (spaces, slashes, …)
+  return SLUG_ALIASES[base] ?? base;
 }
+
+// Module-level cache: slug → SVG markup, or null when the brand is absent.
+// `undefined` (key missing) = not fetched yet.
+const iconCache = new Map<string, string | null>();
 
 export function SkillIcon({
   name,
@@ -39,22 +63,49 @@ export function SkillIcon({
   className?: string;
 }) {
   const slug = name ? skillSlug(name) : '';
-  const [hidden, setHidden] = useState(false);
+  const [svg, setSvg] = useState<string | null>(() =>
+    slug ? iconCache.get(slug) ?? null : null,
+  );
 
-  if (!slug || hidden) return null;
+  useEffect(() => {
+    if (!slug) {
+      setSvg(null);
+      return;
+    }
+    const cached = iconCache.get(slug);
+    if (cached !== undefined) {
+      setSvg(cached);
+      return;
+    }
+
+    let active = true;
+    fetch(`https://cdn.simpleicons.org/${slug}`)
+      // res.ok === false (e.g. 404) resolves normally — no console error.
+      .then((res) => (res.ok ? res.text() : null))
+      .then((text) => {
+        iconCache.set(slug, text);
+        if (active) setSvg(text);
+      })
+      .catch(() => {
+        // Network failure — treat as "no icon", silently.
+        iconCache.set(slug, null);
+        if (active) setSvg(null);
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [slug]);
+
+  if (!svg) return null;
 
   return (
-    // eslint-disable-next-line @next/next/no-img-element
-    <img
-      src={`https://cdn.simpleicons.org/${slug}`}
-      alt=""
-      aria-hidden="true"
-      width={size}
-      height={size}
+    <span
+      className={`shrink-0 inline-flex [&>svg]:block [&>svg]:w-full [&>svg]:h-full ${className ?? ''}`}
       style={{ width: size, height: size }}
-      className={`shrink-0 ${className ?? ''}`}
-      loading="lazy"
-      onError={() => setHidden(true)}
+      aria-hidden="true"
+      // SVG markup comes from the trusted Simple Icons CDN.
+      dangerouslySetInnerHTML={{ __html: svg }}
     />
   );
 }
