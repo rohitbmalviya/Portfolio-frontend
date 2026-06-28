@@ -21,11 +21,12 @@ import {
 } from '@/components/projects/screenshot-lightbox';
 import { formatBlogDate } from '@/lib/utils';
 import { getConfigOptions } from '@/lib/api';
+import { MEDIA_CATEGORY_LABELS } from '@/lib/media';
 
 // ── Category section order ────────────────────────────────────
 
-// Hardcoded fallback — used when the config API returns nothing.
-const CATEGORIES = ['Projects', 'Blog', 'Awards', 'Profile', 'Misc'] as const;
+// Fallback grouping order — used when the config API returns nothing.
+const CATEGORIES = MEDIA_CATEGORY_LABELS;
 
 /**
  * Groups media by category and orders groups by `categoryOrder`.

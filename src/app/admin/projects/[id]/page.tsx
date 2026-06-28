@@ -25,6 +25,7 @@ import {
   LoadingRows,
 } from '@/components/admin/ui';
 import { MultiImageUpload } from '@/components/admin/image-upload';
+import { MediaCategory } from '@/lib/media';
 
 type FormState = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>;
 
@@ -235,6 +236,7 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
           </h2>
           <MultiImageUpload
             label="Screenshots"
+            category={MediaCategory.Projects}
             value={form.screenshots as Array<{ url: string; alt: string }>}
             onChange={(items) => set('screenshots', items)}
           />

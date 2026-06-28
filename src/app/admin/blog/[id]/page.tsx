@@ -22,6 +22,7 @@ import {
   LoadingRows,
 } from '@/components/admin/ui';
 import { ImageUpload } from '@/components/admin/image-upload';
+import { MediaCategory } from '@/lib/media';
 
 type FormState = Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt' | 'publishedAt'>;
 
@@ -175,6 +176,7 @@ function BlogFormContent({ postId }: { postId: string | null }) {
             Cover Image
           </h2>
           <ImageUpload
+            category={MediaCategory.Blogs}
             value={form.coverImage ?? null}
             onChange={(url) => set('coverImage', url ?? '')}
             hint="Recommended: 1200×630px"

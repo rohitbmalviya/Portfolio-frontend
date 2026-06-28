@@ -9,6 +9,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Upload, X, Loader2, ImageIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { adminMedia } from '@/lib/admin-api';
+import { MediaCategory } from '@/lib/media';
 import { cn } from '@/lib/utils';
 import { useToast } from './toast';
 
@@ -18,6 +19,8 @@ interface ImageUploadProps {
   label?: string;
   hint?: string;
   accept?: string;
+  /** Routes the upload to a Cloudinary subfolder + Media category. Defaults to Raw. */
+  category?: MediaCategory;
 }
 
 export function ImageUpload({
@@ -26,6 +29,7 @@ export function ImageUpload({
   label,
   hint,
   accept = 'image/*',
+  category,
 }: ImageUploadProps) {
   const { error: toastError } = useToast();
   const [uploading, setUploading] = useState(false);
@@ -37,7 +41,7 @@ export function ImageUpload({
     async (file: File) => {
       setUploading(true);
       try {
-        const media = await adminMedia.upload(file, file.name);
+        const media = await adminMedia.upload(file, file.name, category);
         onChange(media.cloudinaryUrl);
       } catch (err) {
         toastError(
@@ -47,7 +51,7 @@ export function ImageUpload({
         setUploading(false);
       }
     },
-    [onChange, toastError],
+    [onChange, toastError, category],
   );
 
   function handleFile(files: FileList | null) {
@@ -198,9 +202,11 @@ interface MultiImageUploadProps {
   value: MediaItem[];
   onChange: (items: MediaItem[]) => void;
   label?: string;
+  /** Routes uploads to a Cloudinary subfolder + Media category. Defaults to Raw. */
+  category?: MediaCategory;
 }
 
-export function MultiImageUpload({ value, onChange, label }: MultiImageUploadProps) {
+export function MultiImageUpload({ value, onChange, label, category }: MultiImageUploadProps) {
   const { error: toastError } = useToast();
   const [uploading, setUploading] = useState(false);
   const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
@@ -231,7 +237,7 @@ export function MultiImageUpload({ value, onChange, label }: MultiImageUploadPro
     setUploading(true);
     try {
       const results = await Promise.all(
-        Array.from(files).map((f) => adminMedia.upload(f, f.name)),
+        Array.from(files).map((f) => adminMedia.upload(f, f.name, category)),
       );
       const newItems: MediaItem[] = results.map((r) => ({
         url: r.cloudinaryUrl,
