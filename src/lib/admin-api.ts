@@ -66,10 +66,15 @@ export interface MeResponse {
 
 // ── Generic write DTOs ────────────────────────────────────────
 
+/**
+ * Write payload for Pages.
+ * `ogImage` and `ogImageMediaId` are excluded — media linking happens
+ * automatically via the upload's `ownerId` / `ownerType` fields.
+ */
 export type CreatePagePayload = Pick<
   Page,
   'slug' | 'title'
-> & Partial<Omit<Page, 'id' | 'slug' | 'title' | 'sections' | '_count' | 'createdAt' | 'updatedAt'>>;
+> & Partial<Omit<Page, 'id' | 'slug' | 'title' | 'sections' | '_count' | 'createdAt' | 'updatedAt' | 'ogImage' | 'ogImageMediaId'>>;
 
 export type UpdatePagePayload = Partial<CreatePagePayload>;
 
@@ -92,10 +97,22 @@ export interface ReorderItem {
   order: number;
 }
 
-export type CreateProjectPayload = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>;
+/**
+ * Write payload for Projects.
+ * Screenshots are no longer referenced by media ID — linking happens automatically
+ * via the upload's `ownerId` / `ownerType` fields. The server returns `screenshots`
+ * in the read shape.
+ */
+export type CreateProjectPayload = Omit<Project, 'id' | 'createdAt' | 'updatedAt' | 'screenshots'>;
 export type UpdateProjectPayload = Partial<CreateProjectPayload>;
 
-export type CreateBlogPayload = Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt' | 'publishedAt'>;
+/**
+ * Write payload for BlogPosts.
+ * Images are no longer referenced by media ID — linking happens automatically
+ * via the upload's `ownerId` / `ownerType` fields. The first uploaded image
+ * becomes the cover. `coverImage` (read-only) is excluded from the write shape.
+ */
+export type CreateBlogPayload = Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt' | 'publishedAt' | 'images' | 'coverImage'>;
 export type UpdateBlogPayload = Partial<CreateBlogPayload>;
 
 export interface CreateSkillPayload {
@@ -106,23 +123,42 @@ export interface CreateSkillPayload {
 }
 export type UpdateSkillPayload = Partial<CreateSkillPayload>;
 
-export type CreateExperiencePayload = Omit<Experience, 'id'>;
+/**
+ * Write payload for Experience.
+ * `logo` (read-only URL) and `logoMediaId` are excluded — media linking happens
+ * automatically via the upload's `ownerId` / `ownerType` fields.
+ */
+export type CreateExperiencePayload = Omit<Experience, 'id' | 'logo' | 'logoMediaId'>;
 export type UpdateExperiencePayload = Partial<CreateExperiencePayload>;
 
-export type CreateEducationPayload = Omit<Education, 'id'>;
+/**
+ * Write payload for Education.
+ * `logo` (read-only URL) and `logoMediaId` are excluded — media linking happens
+ * automatically via the upload's `ownerId` / `ownerType` fields.
+ */
+export type CreateEducationPayload = Omit<Education, 'id' | 'logo' | 'logoMediaId'>;
 export type UpdateEducationPayload = Partial<CreateEducationPayload>;
 
+/**
+ * Write payload for Achievements.
+ * `image` (read-only URL) and `imageMediaId` are excluded — media linking happens
+ * automatically via the upload's `ownerId` / `ownerType` fields.
+ */
 export interface CreateAchievementPayload {
   title: string;
   description: string;
   date?: string | null;
-  image?: string | null;
   order?: number;
 }
 export type UpdateAchievementPayload = Partial<CreateAchievementPayload>;
 
+/**
+ * Write payload for SiteSettings.
+ * `resumeUrl`, `ogImage` (read-only URLs), `resumeMediaId`, and `ogImageMediaId`
+ * are excluded — media linking happens automatically via the upload's owner fields.
+ */
 export type UpdateSettingsPayload = Partial<
-  Omit<SiteSettings, 'id' | 'createdAt' | 'updatedAt'>
+  Omit<SiteSettings, 'id' | 'createdAt' | 'updatedAt' | 'resumeUrl' | 'ogImage' | 'resumeMediaId' | 'ogImageMediaId'>
 >;
 
 // ── Low-level fetch ───────────────────────────────────────────
@@ -470,19 +506,28 @@ export const adminSettings = {
 export const adminMedia = {
   list: () => adminFetch<MediaRecord[]>('/api/media'),
 
+  /** Legacy upload used by the media library (non-deferred). */
   upload: (
     file: File,
-    alt?: string,
-    category?: string,
-    entitySlug?: string,
-    sequence?: number,
+    opts: {
+      alt?: string;
+      category?: string;
+      entitySlug?: string;
+      ownerId?: string;
+      ownerType?: string;
+      usage?: string;
+      order?: number;
+    } = {},
   ) => {
     const fd = new FormData();
     fd.append('file', file);
-    if (alt) fd.append('alt', alt);
-    if (category) fd.append('category', category);
-    if (entitySlug) fd.append('entitySlug', entitySlug);
-    if (sequence !== undefined) fd.append('sequence', String(sequence));
+    if (opts.alt) fd.append('alt', opts.alt);
+    if (opts.category) fd.append('category', opts.category);
+    if (opts.entitySlug) fd.append('entitySlug', opts.entitySlug);
+    if (opts.ownerId) fd.append('ownerId', opts.ownerId);
+    if (opts.ownerType) fd.append('ownerType', opts.ownerType);
+    if (opts.usage) fd.append('usage', opts.usage);
+    if (opts.order !== undefined) fd.append('order', String(opts.order));
     return adminUpload<MediaRecord>('/api/media', fd);
   },
 
@@ -495,6 +540,61 @@ export const adminMedia = {
   delete: (id: string) =>
     adminFetch<void>(`/api/media/${id}`, { method: 'DELETE' }),
 };
+
+// ── Standalone media helpers (used by media-save.ts) ─────────
+
+export type MediaOwnerType =
+  | 'project'
+  | 'blog'
+  | 'experience'
+  | 'education'
+  | 'achievement'
+  | 'page'
+  | 'settings';
+
+/**
+ * Upload a file to POST /api/media and auto-link to the owner entity.
+ * Returns the created MediaRecord.
+ */
+export function uploadMedia(
+  file: File,
+  opts: {
+    category?: string;
+    entitySlug?: string;
+    ownerId?: string;
+    ownerType?: MediaOwnerType | string;
+    usage?: string;
+    order?: number;
+    alt?: string;
+  },
+): Promise<MediaRecord> {
+  const fd = new FormData();
+  fd.append('file', file);
+  if (opts.alt) fd.append('alt', opts.alt);
+  if (opts.category) fd.append('category', opts.category);
+  if (opts.entitySlug) fd.append('entitySlug', opts.entitySlug);
+  if (opts.ownerId) fd.append('ownerId', opts.ownerId);
+  if (opts.ownerType) fd.append('ownerType', opts.ownerType);
+  if (opts.usage) fd.append('usage', opts.usage);
+  if (opts.order !== undefined) fd.append('order', String(opts.order));
+  return adminUpload<MediaRecord>('/api/media', fd);
+}
+
+/** Hard-delete a media record from Cloudinary + DB. */
+export function deleteMedia(id: string): Promise<void> {
+  return adminFetch<void>(`/api/media/${id}`, { method: 'DELETE' });
+}
+
+/** PATCH a media record's order, alt, or usage. */
+export function patchMedia(
+  id: string,
+  payload: { order?: number; alt?: string; usage?: string },
+): Promise<MediaRecord> {
+  return adminFetch<MediaRecord>(`/api/media/${id}`, {
+    method: 'PATCH',
+    body: JSON.stringify(payload),
+  });
+}
 
 // ── Dashboard stats (single call for all content counts) ──────
 

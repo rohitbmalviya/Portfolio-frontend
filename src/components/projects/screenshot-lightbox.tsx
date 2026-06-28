@@ -10,7 +10,10 @@
 
 import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
-import type { MediaItem } from '@/lib/types';
+
+/** Minimal shape — structurally satisfied by MediaItem, Project.screenshots items,
+ *  BlogPost.images items, and hand-built { url, alt } objects alike. */
+type LightboxItem = { url: string; alt?: string };
 
 interface LightboxApi {
   open: (index: number) => void;
@@ -23,7 +26,7 @@ export function ScreenshotLightbox({
   screenshots,
   children,
 }: {
-  screenshots: MediaItem[];
+  screenshots: LightboxItem[];
   children: React.ReactNode;
 }) {
   const [index, setIndex] = useState<number | null>(null);
@@ -75,7 +78,7 @@ export function ScreenshotLightbox({
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={current.url}
-            alt={current.alt || 'Screenshot'}
+            alt={current.alt ?? 'Screenshot'}
             className="max-w-[92vw] max-h-[88vh] object-contain rounded-[8px]"
             onClick={(e) => e.stopPropagation()}
           />

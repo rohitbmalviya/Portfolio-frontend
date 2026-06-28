@@ -35,14 +35,14 @@ export default async function BlogIndexPage() {
 
         {/* Posts grid */}
         {posts.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-[22px]">
             {posts.map((post) => (
               <BlogCard key={post.id} post={post} />
             ))}
           </div>
         ) : (
           <div className="text-center py-24">
-            <p className="font-mono text-[--muted] text-[14px] mb-2">// no posts yet</p>
+            <p className="font-mono text-[--muted] text-[14px] mb-2">{'// no posts yet'}</p>
             <p className="text-[--muted]">Posts are coming soon — check back shortly.</p>
           </div>
         )}

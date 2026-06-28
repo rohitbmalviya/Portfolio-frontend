@@ -43,7 +43,7 @@ export default function GlobalError({
               marginBottom: 16,
             }}
           >
-            // error
+            {'// error'}
           </p>
           <h1 style={{ fontSize: 40, fontWeight: 700, margin: '0 0 16px', letterSpacing: -1 }}>
             Something went wrong.

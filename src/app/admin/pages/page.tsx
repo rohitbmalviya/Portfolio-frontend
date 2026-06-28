@@ -8,6 +8,7 @@ import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Check, ExternalLink, FileText, Pencil, Plus, Trash2, X, AlertTriangle } from 'lucide-react';
 import { adminPages, type CreatePagePayload } from '@/lib/admin-api';
+import { reconcileSingleMedia } from '@/lib/media-save';
 import type { Page } from '@/lib/types';
 import { AdminShell } from '@/components/admin/admin-shell';
 import {
@@ -21,7 +22,7 @@ import {
   AdminTextarea,
   AdminToggle,
 } from '@/components/admin/ui';
-import { ImageUpload } from '@/components/admin/image-upload';
+import { ImageUpload, type ImageValue } from '@/components/admin/image-upload';
 import { useToast } from '@/components/admin/toast';
 import { ToastProvider } from '@/components/admin/toast';
 
@@ -40,7 +41,7 @@ function PagesContent() {
   const [newSlug, setNewSlug] = useState('');
   const [newMetaTitle, setNewMetaTitle] = useState('');
   const [newMetaDescription, setNewMetaDescription] = useState('');
-  const [newOgImage, setNewOgImage] = useState<string | null>(null);
+  const [newOgImage, setNewOgImage] = useState<ImageValue | null>(null);
   const [newNavLabel, setNewNavLabel] = useState('');
   const [newNavOrder, setNewNavOrder] = useState(0);
   const [newShowInNav, setNewShowInNav] = useState(false);
@@ -91,13 +92,29 @@ function PagesContent() {
         // Omit nullable strings when empty so the backend keeps its own defaults
         ...(newMetaTitle.trim() ? { metaTitle: newMetaTitle.trim() } : {}),
         ...(newMetaDescription.trim() ? { metaDescription: newMetaDescription.trim() } : {}),
-        ...(newOgImage ? { ogImage: newOgImage } : {}),
+        // ogImageMediaId is no longer sent — upload links via ownerId/ownerType
         ...(newNavLabel.trim() ? { navLabel: newNavLabel.trim() } : {}),
         navOrder: newNavOrder,
         showInNav: newShowInNav,
         published: newPublished,
       };
       const page = await adminPages.create(payload);
+
+      // Upload the pending OG image and link it to the new page.
+      if (newOgImage) {
+        const mediaErrors = await reconcileSingleMedia({
+          value: newOgImage,
+          originalMediaId: null,
+          ownerId: page.id,
+          ownerType: 'page',
+          usage: 'og',
+          category: 'Raw',
+        });
+        if (mediaErrors.length > 0) {
+          toastError(`Page created, but OG image upload failed: ${mediaErrors.join('; ')}`);
+        }
+      }
+
       setPages((p) => [...p, page]);
       setShowCreate(false);
       resetCreateForm();
@@ -302,8 +319,8 @@ function PagesContent() {
               <ImageUpload
                 label="OG Image"
                 value={newOgImage}
-                onChange={setNewOgImage}
-                hint="Social-share preview image ~1200×630."
+                onChange={(val: ImageValue | null) => setNewOgImage(val)}
+                hint="Social-share preview image ~1200×630. Uploaded when the page is created."
               />
 
               {/* Toggles */}

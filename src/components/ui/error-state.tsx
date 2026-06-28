@@ -29,7 +29,7 @@ export function ErrorState({
       id="main-content"
     >
       <div className="wrap max-w-[520px] mx-auto">
-        <p className="font-mono text-[--accent] text-[13px] tracking-[2px] mb-4">// error</p>
+        <p className="font-mono text-[--accent] text-[13px] tracking-[2px] mb-4">{'// error'}</p>
 
         <h1
           className="font-display font-bold leading-[1.05] tracking-[-1.5px] mb-5"

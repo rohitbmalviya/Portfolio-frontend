@@ -32,7 +32,7 @@ export default async function PublicLayout({
         <main id="main-content" tabIndex={-1}>
           {children}
         </main>
-        <Footer settings={settings} />
+        <Footer navItems={navItems} settings={settings} />
       </div>
     </>
   );

@@ -18,7 +18,7 @@ export default function NotFound() {
       >
         <div className="wrap max-w-[520px] mx-auto">
           {/* Mono 404 */}
-          <p className="font-mono text-[--accent] text-[13px] tracking-[2px] mb-4">// 404</p>
+          <p className="font-mono text-[--accent] text-[13px] tracking-[2px] mb-4">{'// 404'}</p>
 
           <h1
             className="font-display font-bold leading-[1.05] tracking-[-1.5px] mb-5"

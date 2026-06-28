@@ -4,30 +4,51 @@
 //  Project create / edit form
 //  Route: /admin/projects/new  →  create
 //         /admin/projects/:id  →  edit
+//
+//  Deferred-upload flow:
+//   Create → adminProjects.create → get id → reconcileMultiMedia
+//   Update → adminProjects.update → reconcileMultiMedia
 // ============================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { adminProjects } from '@/lib/admin-api';
-import type { Project } from '@/lib/types';
+import { reconcileMultiMedia } from '@/lib/media-save';
+import { MediaCategory } from '@/lib/media';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
 import {
   AdminInput,
   AdminTextarea,
-  AdminSelect,
   AdminToggle,
   AdminButton,
   AdminCard,
   TagsInput,
   LoadingRows,
 } from '@/components/admin/ui';
-import { MultiImageUpload } from '@/components/admin/image-upload';
-import { MediaCategory } from '@/lib/media';
+import { MultiImageUpload, type ImageValue } from '@/components/admin/image-upload';
 
-type FormState = Omit<Project, 'id' | 'createdAt' | 'updatedAt'>;
+// ── Form state ─────────────────────────────────────────────────
+
+interface FormState {
+  slug: string;
+  title: string;
+  oneLiner: string;
+  role: string;
+  tags: string[];
+  stack: string[];
+  metric: string;
+  liveUrl: string;
+  screenshots: ImageValue[];
+  overview: string;
+  contribution: string;
+  body: string;
+  featured: boolean;
+  order: number;
+  published: boolean;
+}
 
 const EMPTY_FORM: FormState = {
   slug: '',
@@ -55,12 +76,23 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
   const [saving, setSaving] = useState(false);
   const isNew = !projectId;
 
+  // Track originalMediaIds to detect additions/removals on update.
+  const originalMediaIdsRef = useRef<string[]>([]);
+
   useEffect(() => {
     if (!projectId) return;
     setLoading(true);
     adminProjects
       .get(projectId)
       .then((p) => {
+        const existingScreenshots: ImageValue[] = (p.screenshots ?? []).map((s) => ({
+          mediaId: s.mediaId,
+          url: s.url,
+          alt: s.alt ?? '',
+        }));
+        originalMediaIdsRef.current = existingScreenshots.map((s) =>
+          'mediaId' in s ? s.mediaId : '',
+        );
         setForm({
           slug: p.slug,
           title: p.title,
@@ -70,7 +102,7 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
           stack: p.stack ?? [],
           metric: p.metric,
           liveUrl: p.liveUrl ?? '',
-          screenshots: (p.screenshots ?? []) as Project['screenshots'],
+          screenshots: existingScreenshots,
           overview: p.overview,
           contribution: p.contribution,
           body: p.body,
@@ -83,7 +115,7 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
       .finally(() => setLoading(false));
   }, [projectId, toastError]);
 
-  // Prefill `order` for a brand-new project to the next free slot (max + 1)
+  // Prefill `order` for a brand-new project to the next free slot.
   useEffect(() => {
     if (projectId) return;
     adminProjects
@@ -107,17 +139,59 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
     }
     setSaving(true);
     try {
+      const { screenshots, ...rest } = form;
       const payload = {
-        ...form,
+        ...rest,
         liveUrl: form.liveUrl || undefined,
       };
+
+      let ownerId: string;
+
       if (isNew) {
         const created = await adminProjects.create(payload);
-        success('Project created.');
+        ownerId = created.id;
+        // Upload pending screenshots linked to the new project.
+        const errors = await reconcileMultiMedia({
+          values: screenshots,
+          originalMediaIds: [],
+          ownerId,
+          ownerType: 'project',
+          category: MediaCategory.Projects,
+          entitySlug: form.slug,
+        });
+        if (errors.length > 0) {
+          toastError(`Project created, but some images failed: ${errors.join('; ')}`);
+        } else {
+          success('Project created.');
+        }
         router.replace(`/admin/projects/${created.id}`);
       } else {
         await adminProjects.update(projectId!, payload);
-        success('Project saved.');
+        ownerId = projectId!;
+        const errors = await reconcileMultiMedia({
+          values: screenshots,
+          originalMediaIds: originalMediaIdsRef.current,
+          ownerId,
+          ownerType: 'project',
+          category: MediaCategory.Projects,
+          entitySlug: form.slug,
+        });
+        if (errors.length > 0) {
+          toastError(`Saved, but some images failed: ${errors.join('; ')}`);
+        } else {
+          success('Project saved.');
+        }
+        // Refresh to reflect server state (new mediaIds, resolved order).
+        const refreshed = await adminProjects.get(projectId!);
+        const refreshedScreenshots: ImageValue[] = (refreshed.screenshots ?? []).map((s) => ({
+          mediaId: s.mediaId,
+          url: s.url,
+          alt: s.alt ?? '',
+        }));
+        originalMediaIdsRef.current = refreshedScreenshots.map((s) =>
+          'mediaId' in s ? s.mediaId : '',
+        );
+        setForm((f) => ({ ...f, screenshots: refreshedScreenshots }));
       }
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Save failed.');
@@ -140,7 +214,7 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
       actions={
         <AdminButton loading={saving} onClick={handleSubmit} type="button">
           <Save size={14} aria-hidden="true" />
-          {isNew ? 'Create project' : 'Save changes'}
+          {saving ? 'Saving…' : isNew ? 'Create project' : 'Save changes'}
         </AdminButton>
       }
     >
@@ -229,17 +303,21 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
           />
         </AdminCard>
 
-        {/* Media */}
+        {/* Media — deferred upload */}
         <AdminCard>
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
             Media
           </h2>
+          <p className="text-[12px] mb-3" style={{ color: 'var(--muted)' }}>
+            Images are uploaded when you save. Reorder with the arrows on hover.
+          </p>
           <MultiImageUpload
             label="Screenshots"
             category={MediaCategory.Projects}
-            value={form.screenshots as Array<{ url: string; alt: string }>}
+            value={form.screenshots}
             onChange={(items) => set('screenshots', items)}
             entitySlug={form.slug}
+            max={4}
           />
         </AdminCard>
 
@@ -272,7 +350,7 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
           </div>
         </AdminCard>
 
-        {/* Flags */}
+        {/* Publishing */}
         <AdminCard>
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
             Publishing
@@ -299,9 +377,9 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
         </AdminCard>
 
         <div className="flex justify-end">
-          <AdminButton loading={saving} type="submit">
+          <AdminButton loading={saving} type="submit" disabled={saving}>
             <Save size={14} aria-hidden="true" />
-            {isNew ? 'Create project' : 'Save changes'}
+            {saving ? 'Saving…' : isNew ? 'Create project' : 'Save changes'}
           </AdminButton>
         </div>
       </form>

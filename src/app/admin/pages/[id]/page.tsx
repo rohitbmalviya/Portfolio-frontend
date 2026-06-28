@@ -27,7 +27,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { adminPages, adminSections } from '@/lib/admin-api';
+import { adminPages, adminSections, uploadMedia } from '@/lib/admin-api';
+import { reconcileSingleMedia } from '@/lib/media-save';
 import type { Page, Section, SectionType, SectionData } from '@/lib/types';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
@@ -42,7 +43,7 @@ import {
   LoadingRows,
   EmptyState,
 } from '@/components/admin/ui';
-import { ImageUpload } from '@/components/admin/image-upload';
+import { ImageUpload, type ImageValue } from '@/components/admin/image-upload';
 import { SectionDataForm } from '@/components/admin/section-data-form';
 import Link from 'next/link';
 import { cn } from '@/lib/utils';
@@ -72,7 +73,8 @@ interface PageSettingsForm {
   slug: string;
   metaTitle: string;
   metaDescription: string;
-  ogImage: string | null;
+  /** OG image — existing (mediaId + url) or pending (file + objectURL). */
+  ogImageValue: ImageValue | null;
   navLabel: string;
   navOrder: number;
   showInNav: boolean;
@@ -86,7 +88,10 @@ function pageToForm(p: Page): PageSettingsForm {
     slug: p.slug,
     metaTitle: p.metaTitle ?? '',
     metaDescription: p.metaDescription ?? '',
-    ogImage: p.ogImage ?? null,
+    ogImageValue:
+      p.ogImageMediaId && p.ogImage
+        ? { mediaId: p.ogImageMediaId, url: p.ogImage }
+        : null,
     navLabel: p.navLabel ?? '',
     navOrder: p.navOrder,
     showInNav: p.showInNav,
@@ -281,7 +286,7 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
     slug: '',
     metaTitle: '',
     metaDescription: '',
-    ogImage: null,
+    ogImageValue: null,
     navLabel: '',
     navOrder: 0,
     showInNav: false,
@@ -289,6 +294,8 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
     isSystem: false,
   });
   const [savingSettings, setSavingSettings] = useState(false);
+  // Track original OG image mediaId for deferred-upload reconcile.
+  const originalOgImageMediaIdRef = useRef<string | null>(null);
   // Warning shown when user tries to switch isSystem from true → false
   const [isSystemWarningOpen, setIsSystemWarningOpen] = useState(false);
 
@@ -325,6 +332,7 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
       const p = await adminPages.get(pageId);
       setPage(p);
       setSections([...(p.sections ?? [])].sort((a, b) => a.order - b.order));
+      originalOgImageMediaIdRef.current = p.ogImageMediaId ?? null;
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Failed to load page.';
       // Treat an explicit 404 / "not found" response as a real missing page;
@@ -383,20 +391,38 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
   async function handleSaveSettings() {
     setSavingSettings(true);
     try {
-      const updated = await adminPages.update(pageId, {
+      // 1. Patch the page entity (no ogImageMediaId — linking via upload owner fields).
+      await adminPages.update(pageId, {
         title: settingsForm.title,
         slug: settingsForm.slug,
         metaTitle: settingsForm.metaTitle || null,
         metaDescription: settingsForm.metaDescription || null,
-        ogImage: settingsForm.ogImage,
         navLabel: settingsForm.navLabel || null,
         navOrder: settingsForm.navOrder,
         showInNav: settingsForm.showInNav,
         published: settingsForm.published,
         isSystem: settingsForm.isSystem,
       });
-      setPage(updated);
-      success('Page settings saved.');
+
+      // 2. Reconcile the OG image (upload pending / delete removed).
+      const mediaErrors = await reconcileSingleMedia({
+        value: settingsForm.ogImageValue,
+        originalMediaId: originalOgImageMediaIdRef.current,
+        ownerId: pageId,
+        ownerType: 'page',
+        usage: 'og',
+        category: 'Raw',
+      });
+      if (mediaErrors.length > 0) {
+        toastError(`Settings saved, but OG image had issues: ${mediaErrors.join('; ')}`);
+      } else {
+        success('Page settings saved.');
+      }
+
+      // 3. Reload page to get fresh ogImage URL + ogImageMediaId.
+      const refreshed = await adminPages.get(pageId);
+      setPage(refreshed);
+      originalOgImageMediaIdRef.current = refreshed.ogImageMediaId ?? null;
     } catch (err) {
       // 409 = duplicate slug/title; surface backend message
       toastError(err instanceof Error ? err.message : 'Failed to save settings.');
@@ -463,7 +489,32 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
   async function handleSaveData(section: Section, data: SectionData) {
     setSavingId(section.id);
     try {
-      const updated = await adminSections.update(section.id, { data });
+      // For GALLERY sections, upload any pending image picks before saving the
+      // JSON blob. Pending items have `file instanceof File` and a blob objectURL.
+      let saveData = data;
+      if (section.type === 'GALLERY') {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const d = data as Record<string, any>;
+        if (Array.isArray(d.images)) {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const resolved = await Promise.allSettled<{ url: string; alt: string }>(
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (d.images as any[]).map(async (img: any, i: number) => {
+              if (img.file instanceof File) {
+                const media = await uploadMedia(img.file, { category: 'Raw', order: i });
+                return { url: media.cloudinaryUrl, alt: img.alt ?? '' };
+              }
+              return { url: String(img.url ?? ''), alt: String(img.alt ?? '') };
+            }),
+          );
+          const images = resolved
+            .map((r) => (r.status === 'fulfilled' ? r.value : null))
+            .filter((img): img is { url: string; alt: string } => img !== null && Boolean(img.url));
+          saveData = { ...d, images } as SectionData;
+        }
+      }
+
+      const updated = await adminSections.update(section.id, { data: saveData });
       setSections((prev) => prev.map((s) => (s.id === section.id ? updated : s)));
       success('Section saved.');
       setExpandedId(null);
@@ -735,12 +786,14 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
               rows={3}
             />
 
-            {/* OG Image */}
+            {/* OG Image — deferred upload */}
             <ImageUpload
               label="OG Image"
-              value={settingsForm.ogImage}
-              onChange={(url) => updateSetting('ogImage', url)}
-              hint="Social-share preview image shown when the page link is shared (WhatsApp, LinkedIn, X). ~1200×630."
+              value={settingsForm.ogImageValue}
+              onChange={(val: ImageValue | null) =>
+                setSettingsForm((prev) => ({ ...prev, ogImageValue: val }))
+              }
+              hint="Social-share preview image shown when the page link is shared (WhatsApp, LinkedIn, X). ~1200×630. Uploaded when you save settings."
             />
 
             {/* Toggles — Show in nav, Published, System page */}

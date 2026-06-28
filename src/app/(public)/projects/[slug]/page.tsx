@@ -193,7 +193,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             {project.stack.length > 0 && (
               <div className="bg-[--surface] border border-[--border] rounded-[14px] p-5">
                 <h3 className="font-mono text-[12px] text-[--accent] mb-3 tracking-[0.5px]">
-                  // TECH STACK
+                  {'// TECH STACK'}
                 </h3>
                 <div className="flex flex-wrap gap-2">
                   {project.stack.map((t) => (
@@ -207,7 +207,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             {project.metric && (
               <div className="bg-[--surface] border border-[--border] rounded-[14px] p-5">
                 <h3 className="font-mono text-[12px] text-[--accent] mb-3 tracking-[0.5px]">
-                  // KEY METRICS
+                  {'// KEY METRICS'}
                 </h3>
                 <p className="text-[--muted] text-[13px] leading-relaxed">{project.metric}</p>
               </div>
@@ -217,7 +217,7 @@ export default async function ProjectDetailPage({ params }: Props) {
             {project.screenshots.length > 1 && (
               <div className="bg-[--surface] border border-[--border] rounded-[14px] p-5">
                 <h3 className="font-mono text-[12px] text-[--accent] mb-3 tracking-[0.5px]">
-                  // SCREENSHOTS
+                  {'// SCREENSHOTS'}
                 </h3>
                 <div className="space-y-3">
                   {project.screenshots.slice(1).map((s, i) => (

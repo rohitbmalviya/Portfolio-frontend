@@ -2,12 +2,21 @@
 
 // ============================================================
 //  Admin Site Settings — singleton PATCH
+//
+//  Deferred-upload flow:
+//   Resume  → pick file → hold as pending → upload on Save
+//   OG Image → pick file → hold as pending → upload on Save
+//
+//  Both uploads use reconcileSingleMedia with:
+//   ownerId = settings.id, ownerType = 'settings'
+//   usage = 'resume' | 'og'
 // ============================================================
 
 import { useEffect, useRef, useState } from 'react';
 import { Save, Loader2, Plus, Trash2, Upload, Download, ExternalLink } from 'lucide-react';
-import { adminSettings, adminMedia } from '@/lib/admin-api';
-import type { SiteSettings, SocialLink, DefaultTheme } from '@/lib/types';
+import { adminSettings } from '@/lib/admin-api';
+import { reconcileSingleMedia } from '@/lib/media-save';
+import type { SocialLink, DefaultTheme } from '@/lib/types';
 import { getConfigOptions } from '@/lib/api';
 import type { ConfigOption } from '@/lib/api';
 import { normalizeSocials } from '@/lib/socials';
@@ -20,8 +29,25 @@ import {
   AdminTextarea,
   AdminSelect,
 } from '@/components/admin/ui';
+import { ImageUpload, type ImageValue } from '@/components/admin/image-upload';
 
-type FormState = Omit<SiteSettings, 'id' | 'createdAt' | 'updatedAt'>;
+// ── Form state ─────────────────────────────────────────────────
+// `resumeValue` and `ogImageValue` hold deferred media values.
+// They are NOT sent in the settings PATCH — linking happens via
+// reconcileSingleMedia on Save.
+
+interface FormState {
+  name: string;
+  tagline: string;
+  email: string;
+  location: string;
+  socials: SocialLink[];
+  defaultTheme: DefaultTheme;
+  brandAccent: string;
+  footerText: string;
+  ogTitle: string;
+  ogDescription: string;
+}
 
 const EMPTY: FormState = {
   name: '',
@@ -29,7 +55,6 @@ const EMPTY: FormState = {
   email: '',
   location: '',
   socials: [],
-  resumeUrl: '',
   defaultTheme: 'DARK',
   brandAccent: '',
   footerText: '',
@@ -42,48 +67,63 @@ function SettingsContent() {
   const [form, setForm] = useState<FormState>(EMPTY);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
-  const [uploadingResume, setUploadingResume] = useState(false);
-  const resumeInputRef = useRef<HTMLInputElement>(null);
   const [socialTypeOptions, setSocialTypeOptions] = useState<ConfigOption[]>([]);
 
-  // Load social link types from config API — backend is the sole source of truth.
+  // Deferred media state — separate from the PATCH payload.
+  const [resumeValue, setResumeValue] = useState<ImageValue | null>(null);
+  const [ogImageValue, setOgImageValue] = useState<ImageValue | null>(null);
+
+  // Track original mediaIds for reconcile (what was loaded from API).
+  const settingsIdRef = useRef<string | null>(null);
+  const originalResumeMediaIdRef = useRef<string | null>(null);
+  const originalOgImageMediaIdRef = useRef<string | null>(null);
+
+  // For the resume pending preview, track its objectURL so we can revoke on change.
+  const resumePendingUrlRef = useRef<string | null>(null);
+
+  // Hidden file input for the resume picker.
+  const resumeInputRef = useRef<HTMLInputElement>(null);
+
+  // Load social link types from config API.
   useEffect(() => {
     getConfigOptions('social_link_types').then((opts) => {
       setSocialTypeOptions(opts);
     });
   }, []);
 
-  async function uploadResume(file: File) {
-    setUploadingResume(true);
-    try {
-      const media = await adminMedia.upload(file, file.name);
-      setForm((f) => ({ ...f, resumeUrl: media.cloudinaryUrl }));
-      success('Résumé uploaded.');
-    } catch (err) {
-      toastError(err instanceof Error ? err.message : 'Résumé upload failed.');
-    } finally {
-      setUploadingResume(false);
-    }
-  }
-
   useEffect(() => {
     setLoading(true);
     adminSettings
       .get()
       .then((s) => {
+        settingsIdRef.current = s.id;
+        originalResumeMediaIdRef.current = s.resumeMediaId ?? null;
+        originalOgImageMediaIdRef.current = s.ogImageMediaId ?? null;
+
         setForm({
           name: s.name,
           tagline: s.tagline,
           email: s.email,
           location: s.location,
           socials: normalizeSocials(s.socials),
-          resumeUrl: s.resumeUrl ?? '',
           defaultTheme: s.defaultTheme,
           brandAccent: s.brandAccent ?? '',
           footerText: s.footerText ?? '',
           ogTitle: s.ogTitle ?? '',
           ogDescription: s.ogDescription ?? '',
         });
+
+        // Initialise deferred media from existing server data.
+        setResumeValue(
+          s.resumeMediaId && s.resumeUrl
+            ? { mediaId: s.resumeMediaId, url: s.resumeUrl }
+            : null,
+        );
+        setOgImageValue(
+          s.ogImageMediaId && s.ogImage
+            ? { mediaId: s.ogImageMediaId, url: s.ogImage }
+            : null,
+        );
       })
       .catch((err) => toastError(err instanceof Error ? err.message : 'Failed to load settings.'))
       .finally(() => setLoading(false));
@@ -116,19 +156,97 @@ function SettingsContent() {
     }));
   }
 
+  // ── Resume deferred handlers ──────────────────────────────────
+
+  function handleResumePick(files: FileList | null) {
+    if (!files || files.length === 0) return;
+    // Revoke the previous pending objectURL.
+    if (resumePendingUrlRef.current) {
+      URL.revokeObjectURL(resumePendingUrlRef.current);
+    }
+    const objectUrl = URL.createObjectURL(files[0]);
+    resumePendingUrlRef.current = objectUrl;
+    setResumeValue({ file: files[0], url: objectUrl });
+    if (resumeInputRef.current) resumeInputRef.current.value = '';
+  }
+
+  function handleResumeRemove() {
+    if (resumeValue && 'file' in resumeValue && resumePendingUrlRef.current) {
+      URL.revokeObjectURL(resumePendingUrlRef.current);
+      resumePendingUrlRef.current = null;
+    }
+    setResumeValue(null);
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (!settingsIdRef.current) {
+      toastError('Settings not loaded yet.');
+      return;
+    }
     setSaving(true);
     try {
+      // 1. PATCH core settings (no resumeMediaId / ogImageMediaId).
       await adminSettings.update({
-        ...form,
-        resumeUrl: form.resumeUrl || undefined,
+        name: form.name,
+        tagline: form.tagline,
+        email: form.email,
+        location: form.location,
+        socials: form.socials,
+        defaultTheme: form.defaultTheme,
         brandAccent: form.brandAccent || undefined,
         footerText: form.footerText || undefined,
         ogTitle: form.ogTitle || undefined,
         ogDescription: form.ogDescription || undefined,
       });
-      success('Settings saved.');
+
+      const ownerId = settingsIdRef.current;
+      const mediaErrorGroups: string[] = [];
+
+      // 2. Reconcile résumé (usage: 'resume').
+      const resumeErrors = await reconcileSingleMedia({
+        value: resumeValue,
+        originalMediaId: originalResumeMediaIdRef.current,
+        ownerId,
+        ownerType: 'settings',
+        usage: 'resume',
+        category: 'Raw',
+      });
+      if (resumeErrors.length > 0) mediaErrorGroups.push(`Resume: ${resumeErrors.join(', ')}`);
+
+      // 3. Reconcile OG image (usage: 'og').
+      const ogErrors = await reconcileSingleMedia({
+        value: ogImageValue,
+        originalMediaId: originalOgImageMediaIdRef.current,
+        ownerId,
+        ownerType: 'settings',
+        usage: 'og',
+        category: 'Raw',
+      });
+      if (ogErrors.length > 0) mediaErrorGroups.push(`OG image: ${ogErrors.join(', ')}`);
+
+      if (mediaErrorGroups.length > 0) {
+        toastError(`Settings saved, but some media had issues: ${mediaErrorGroups.join('; ')}`);
+      } else {
+        success('Settings saved.');
+      }
+
+      // 4. Reload to get fresh URLs and reset original mediaIds.
+      const refreshed = await adminSettings.get();
+      originalResumeMediaIdRef.current = refreshed.resumeMediaId ?? null;
+      originalOgImageMediaIdRef.current = refreshed.ogImageMediaId ?? null;
+      setResumeValue(
+        refreshed.resumeMediaId && refreshed.resumeUrl
+          ? { mediaId: refreshed.resumeMediaId, url: refreshed.resumeUrl }
+          : null,
+      );
+      setOgImageValue(
+        refreshed.ogImageMediaId && refreshed.ogImage
+          ? { mediaId: refreshed.ogImageMediaId, url: refreshed.ogImage }
+          : null,
+      );
+      // Clear pending objectURL refs after reload.
+      resumePendingUrlRef.current = null;
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Save failed.');
     } finally {
@@ -147,6 +265,7 @@ function SettingsContent() {
   }
 
   const socials = form.socials as SocialLink[];
+  const resumeDisplayUrl = resumeValue?.url ?? null;
 
   return (
     <AdminShell
@@ -155,7 +274,7 @@ function SettingsContent() {
       actions={
         <AdminButton loading={saving} onClick={handleSubmit} type="button">
           <Save size={14} aria-hidden="true" />
-          Save settings
+          {saving ? 'Saving…' : 'Save settings'}
         </AdminButton>
       }
     >
@@ -191,7 +310,8 @@ function SettingsContent() {
               value={form.email}
               onChange={(e) => set('email', e.target.value)}
             />
-            {/* Résumé — upload to Cloudinary, with preview + download */}
+
+            {/* Résumé — deferred upload */}
             <div>
               <label className="text-[13px] font-medium" style={{ color: 'var(--text)' }}>
                 Résumé (PDF)
@@ -201,38 +321,51 @@ function SettingsContent() {
                 type="file"
                 accept="application/pdf,.pdf"
                 className="sr-only"
-                onChange={(e) => e.target.files?.[0] && uploadResume(e.target.files[0])}
+                onChange={(e) => handleResumePick(e.target.files)}
               />
 
-              {form.resumeUrl ? (
+              {resumeDisplayUrl ? (
                 <div
                   className="mt-1.5 rounded-[10px] border overflow-hidden"
                   style={{ borderColor: 'var(--border)' }}
                 >
-                  <iframe
-                    src={form.resumeUrl}
-                    title="Résumé preview"
-                    className="w-full h-64 bg-white"
-                  />
+                  {/* Show iframe only for Cloudinary URLs (not objectURLs) */}
+                  {resumeValue && !('file' in resumeValue) ? (
+                    <iframe
+                      src={resumeDisplayUrl}
+                      title="Résumé preview"
+                      className="w-full h-64 bg-white"
+                    />
+                  ) : (
+                    <div
+                      className="flex items-center justify-center h-16 text-[13px]"
+                      style={{ color: 'var(--muted)', backgroundColor: 'var(--surface-2)' }}
+                    >
+                      PDF selected — will upload on save
+                    </div>
+                  )}
                   <div
                     className="flex flex-wrap items-center gap-2 p-2 border-t"
                     style={{ borderColor: 'var(--border)' }}
                   >
-                    <a href={form.resumeUrl} target="_blank" rel="noopener noreferrer">
-                      <AdminButton variant="ghost" size="sm" type="button">
-                        <ExternalLink size={13} aria-hidden="true" /> View
-                      </AdminButton>
-                    </a>
-                    <a href={form.resumeUrl} download>
-                      <AdminButton variant="ghost" size="sm" type="button">
-                        <Download size={13} aria-hidden="true" /> Download
-                      </AdminButton>
-                    </a>
+                    {resumeValue && !('file' in resumeValue) && (
+                      <>
+                        <a href={resumeDisplayUrl} target="_blank" rel="noopener noreferrer">
+                          <AdminButton variant="ghost" size="sm" type="button">
+                            <ExternalLink size={13} aria-hidden="true" /> View
+                          </AdminButton>
+                        </a>
+                        <a href={resumeDisplayUrl} download>
+                          <AdminButton variant="ghost" size="sm" type="button">
+                            <Download size={13} aria-hidden="true" /> Download
+                          </AdminButton>
+                        </a>
+                      </>
+                    )}
                     <AdminButton
                       variant="ghost"
                       size="sm"
                       type="button"
-                      loading={uploadingResume}
                       onClick={() => resumeInputRef.current?.click()}
                     >
                       <Upload size={13} aria-hidden="true" /> Replace
@@ -241,7 +374,7 @@ function SettingsContent() {
                       variant="danger"
                       size="sm"
                       type="button"
-                      onClick={() => set('resumeUrl', '')}
+                      onClick={handleResumeRemove}
                     >
                       <Trash2 size={13} aria-hidden="true" /> Remove
                     </AdminButton>
@@ -252,10 +385,9 @@ function SettingsContent() {
                   <AdminButton
                     variant="ghost"
                     type="button"
-                    loading={uploadingResume}
                     onClick={() => resumeInputRef.current?.click()}
                   >
-                    <Upload size={14} aria-hidden="true" /> Upload résumé (PDF)
+                    <Upload size={14} aria-hidden="true" /> Upload résumé (PDF) — saved on submit
                   </AdminButton>
                 </div>
               )}
@@ -356,13 +488,20 @@ function SettingsContent() {
               onChange={(e) => set('ogDescription', e.target.value)}
               rows={3}
             />
+            {/* OG Image — deferred upload */}
+            <ImageUpload
+              label="OG Image"
+              value={ogImageValue}
+              onChange={setOgImageValue}
+              hint="Default social-share image ~1200×630 px. Uploaded when you save."
+            />
           </div>
         </AdminCard>
 
         <div className="flex justify-end">
-          <AdminButton loading={saving} type="submit">
+          <AdminButton loading={saving} type="submit" disabled={saving}>
             <Save size={14} aria-hidden="true" />
-            Save settings
+            {saving ? 'Saving…' : 'Save settings'}
           </AdminButton>
         </div>
       </form>

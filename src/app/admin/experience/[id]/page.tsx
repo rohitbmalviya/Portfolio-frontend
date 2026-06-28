@@ -4,16 +4,21 @@
 //  Experience create / edit form
 //  Route: /admin/experience/new  →  create
 //         /admin/experience/:id  →  edit
+//
+//  Deferred-upload flow:
+//   Create → adminExperience.create → get id → reconcileSingleMedia
+//   Update → adminExperience.update → reconcileSingleMedia
 // ============================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { adminExperience } from '@/lib/admin-api';
+import { reconcileSingleMedia } from '@/lib/media-save';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
-import { ImageUpload } from '@/components/admin/image-upload';
+import { ImageUpload, type ImageValue } from '@/components/admin/image-upload';
 import {
   AdminInput,
   AdminToggle,
@@ -25,8 +30,8 @@ import {
 import { DatePicker } from '@/components/admin/date-picker';
 
 // ── Form state ─────────────────────────────────────────────────
-// `present` is a UI-only flag; serialises to endDate: null when true.
-// startDate / endDate are stored as YYYY-MM-DD strings (what <input type="date"> uses).
+// `present` is UI-only; serialises to endDate: null when true.
+// `logoValue` holds the current ImageValue (existing or pending).
 
 interface FormState {
   role: string;
@@ -37,7 +42,7 @@ interface FormState {
   present: boolean;
   bullets: string[];
   order: number;
-  logo: string;
+  logoValue: ImageValue | null;
 }
 
 const EMPTY_FORM: FormState = {
@@ -49,7 +54,7 @@ const EMPTY_FORM: FormState = {
   present: false,
   bullets: [],
   order: 0,
-  logo: '',
+  logoValue: null,
 };
 
 function ExperienceFormContent({ experienceId }: { experienceId: string | null }) {
@@ -60,25 +65,30 @@ function ExperienceFormContent({ experienceId }: { experienceId: string | null }
   const [saving, setSaving] = useState(false);
   const isNew = !experienceId;
 
-  // Load existing experience by id
+  // Track the original mediaId so we can delete it if replaced/removed.
+  const originalMediaIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!experienceId) return;
     setLoading(true);
     adminExperience
       .get(experienceId)
       .then((exp) => {
+        const logoValue: ImageValue | null =
+          exp.logoMediaId && exp.logo
+            ? { mediaId: exp.logoMediaId, url: exp.logo }
+            : null;
+        originalMediaIdRef.current = exp.logoMediaId ?? null;
         setForm({
           role: exp.role,
           company: exp.company,
           location: exp.location,
-          // API may return a full ISO datetime — slice to YYYY-MM-DD for the date input
           startDate: exp.startDate ? exp.startDate.slice(0, 10) : '',
           endDate: exp.endDate ? exp.endDate.slice(0, 10) : '',
-          // endDate === null means "Present / current role"
           present: exp.endDate === null,
           bullets: exp.bullets ?? [],
           order: exp.order,
-          logo: exp.logo ?? '',
+          logoValue,
         });
       })
       .catch((err) =>
@@ -87,7 +97,6 @@ function ExperienceFormContent({ experienceId }: { experienceId: string | null }
       .finally(() => setLoading(false));
   }, [experienceId, toastError]);
 
-  // Prefill order for brand-new entry: max(existing) + 1
   useEffect(() => {
     if (experienceId) return;
     adminExperience
@@ -126,17 +135,50 @@ function ExperienceFormContent({ experienceId }: { experienceId: string | null }
         bullets: form.bullets,
         order: form.order,
         startDate: form.startDate,
-        // present toggle → null; otherwise use the YYYY-MM-DD value (or null if empty)
         endDate: form.present ? null : (form.endDate || null),
-        logo: form.logo || null,
       };
+
+      let ownerId: string;
+
       if (isNew) {
         const created = await adminExperience.create(payload);
-        success('Experience created.');
+        ownerId = created.id;
+        const errors = await reconcileSingleMedia({
+          value: form.logoValue,
+          originalMediaId: null,
+          ownerId,
+          ownerType: 'experience',
+          category: 'Raw',
+        });
+        if (errors.length > 0) {
+          toastError(`Experience created, but logo upload failed: ${errors.join('; ')}`);
+        } else {
+          success('Experience created.');
+        }
         router.replace(`/admin/experience/${created.id}`);
       } else {
         await adminExperience.update(experienceId!, payload);
-        success('Experience saved.');
+        ownerId = experienceId!;
+        const errors = await reconcileSingleMedia({
+          value: form.logoValue,
+          originalMediaId: originalMediaIdRef.current,
+          ownerId,
+          ownerType: 'experience',
+          category: 'Raw',
+        });
+        if (errors.length > 0) {
+          toastError(`Saved, but logo update had issues: ${errors.join('; ')}`);
+        } else {
+          success('Experience saved.');
+        }
+        // Refresh to get updated logo info.
+        const refreshed = await adminExperience.get(experienceId!);
+        originalMediaIdRef.current = refreshed.logoMediaId ?? null;
+        const logoValue: ImageValue | null =
+          refreshed.logoMediaId && refreshed.logo
+            ? { mediaId: refreshed.logoMediaId, url: refreshed.logo }
+            : null;
+        setForm((f) => ({ ...f, logoValue }));
       }
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Save failed.');
@@ -159,7 +201,7 @@ function ExperienceFormContent({ experienceId }: { experienceId: string | null }
       actions={
         <AdminButton loading={saving} onClick={handleSubmit} type="button">
           <Save size={14} aria-hidden="true" />
-          {isNew ? 'Create experience' : 'Save changes'}
+          {saving ? 'Saving…' : isNew ? 'Create experience' : 'Save changes'}
         </AdminButton>
       }
     >
@@ -200,13 +242,13 @@ function ExperienceFormContent({ experienceId }: { experienceId: string | null }
               className="sm:col-span-2"
             />
           </div>
-          {/* Company logo — optional */}
+          {/* Company logo — deferred upload */}
           <div className="mt-4">
             <ImageUpload
               label="Company logo (optional)"
-              hint="Recommended: square PNG/SVG, min 80×80. Stored via Cloudinary."
-              value={form.logo || null}
-              onChange={(url) => set('logo', url ?? '')}
+              hint="Recommended: square PNG/SVG, min 80×80. Uploaded when you save."
+              value={form.logoValue}
+              onChange={(val) => set('logoValue', val)}
             />
           </div>
         </AdminCard>
@@ -266,9 +308,9 @@ function ExperienceFormContent({ experienceId }: { experienceId: string | null }
         </AdminCard>
 
         <div className="flex justify-end">
-          <AdminButton loading={saving} type="submit">
+          <AdminButton loading={saving} type="submit" disabled={saving}>
             <Save size={14} aria-hidden="true" />
-            {isNew ? 'Create experience' : 'Save changes'}
+            {saving ? 'Saving…' : isNew ? 'Create experience' : 'Save changes'}
           </AdminButton>
         </div>
       </form>

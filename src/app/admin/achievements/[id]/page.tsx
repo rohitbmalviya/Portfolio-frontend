@@ -4,16 +4,21 @@
 //  Achievement create / edit form
 //  Route: /admin/achievements/new  →  create
 //         /admin/achievements/:id  →  edit
+//
+//  Deferred-upload flow:
+//   Create → adminAchievements.create → get id → reconcileSingleMedia
+//   Update → adminAchievements.update → reconcileSingleMedia
 // ============================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { adminAchievements } from '@/lib/admin-api';
+import { reconcileSingleMedia } from '@/lib/media-save';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
-import { ImageUpload } from '@/components/admin/image-upload';
+import { ImageUpload, type ImageValue } from '@/components/admin/image-upload';
 import {
   AdminInput,
   AdminTextarea,
@@ -24,15 +29,13 @@ import {
 import { DatePicker } from '@/components/admin/date-picker';
 
 // ── Form state ─────────────────────────────────────────────────
-// `date` is stored as YYYY-MM-DD string (what <input type="date"> uses),
-// or empty string when null.
-// `image` is stored as a Cloudinary URL string, or empty string when null.
+// `imageValue` holds the current ImageValue (existing or pending).
 
 interface FormState {
   title: string;
   description: string;
   date: string;
-  image: string;
+  imageValue: ImageValue | null;
   order: number;
 }
 
@@ -40,7 +43,7 @@ const EMPTY_FORM: FormState = {
   title: '',
   description: '',
   date: '',
-  image: '',
+  imageValue: null,
   order: 0,
 };
 
@@ -52,19 +55,25 @@ function AchievementFormContent({ achievementId }: { achievementId: string | nul
   const [saving, setSaving] = useState(false);
   const isNew = !achievementId;
 
-  // Load existing achievement by id
+  // Track the original mediaId so we can delete it if replaced/removed.
+  const originalMediaIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!achievementId) return;
     setLoading(true);
     adminAchievements
       .get(achievementId)
       .then((ach) => {
+        const imageValue: ImageValue | null =
+          ach.imageMediaId && ach.image
+            ? { mediaId: ach.imageMediaId, url: ach.image }
+            : null;
+        originalMediaIdRef.current = ach.imageMediaId ?? null;
         setForm({
           title: ach.title,
           description: ach.description,
-          // API may return a full ISO datetime — slice to YYYY-MM-DD for the date input
           date: ach.date ? ach.date.slice(0, 10) : '',
-          image: ach.image ?? '',
+          imageValue,
           order: ach.order,
         });
       })
@@ -74,7 +83,6 @@ function AchievementFormContent({ achievementId }: { achievementId: string | nul
       .finally(() => setLoading(false));
   }, [achievementId, toastError]);
 
-  // Prefill order for brand-new entry: max(existing) + 1
   useEffect(() => {
     if (achievementId) return;
     adminAchievements
@@ -101,18 +109,51 @@ function AchievementFormContent({ achievementId }: { achievementId: string | nul
       const payload = {
         title: form.title.trim(),
         description: form.description.trim(),
-        // Empty string → null; otherwise the YYYY-MM-DD value
         date: form.date || null,
-        image: form.image || null,
         order: form.order,
       };
+
+      let ownerId: string;
+
       if (isNew) {
         const created = await adminAchievements.create(payload);
-        success('Achievement created.');
+        ownerId = created.id;
+        const errors = await reconcileSingleMedia({
+          value: form.imageValue,
+          originalMediaId: null,
+          ownerId,
+          ownerType: 'achievement',
+          category: 'Raw',
+        });
+        if (errors.length > 0) {
+          toastError(`Achievement created, but image upload failed: ${errors.join('; ')}`);
+        } else {
+          success('Achievement created.');
+        }
         router.replace(`/admin/achievements/${created.id}`);
       } else {
         await adminAchievements.update(achievementId!, payload);
-        success('Achievement saved.');
+        ownerId = achievementId!;
+        const errors = await reconcileSingleMedia({
+          value: form.imageValue,
+          originalMediaId: originalMediaIdRef.current,
+          ownerId,
+          ownerType: 'achievement',
+          category: 'Raw',
+        });
+        if (errors.length > 0) {
+          toastError(`Saved, but image update had issues: ${errors.join('; ')}`);
+        } else {
+          success('Achievement saved.');
+        }
+        // Refresh to get updated image info.
+        const refreshed = await adminAchievements.get(achievementId!);
+        originalMediaIdRef.current = refreshed.imageMediaId ?? null;
+        const imageValue: ImageValue | null =
+          refreshed.imageMediaId && refreshed.image
+            ? { mediaId: refreshed.imageMediaId, url: refreshed.image }
+            : null;
+        setForm((f) => ({ ...f, imageValue }));
       }
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Save failed.');
@@ -135,7 +176,7 @@ function AchievementFormContent({ achievementId }: { achievementId: string | nul
       actions={
         <AdminButton loading={saving} onClick={handleSubmit} type="button">
           <Save size={14} aria-hidden="true" />
-          {isNew ? 'Create achievement' : 'Save changes'}
+          {saving ? 'Saving…' : isNew ? 'Create achievement' : 'Save changes'}
         </AdminButton>
       }
     >
@@ -186,16 +227,16 @@ function AchievementFormContent({ achievementId }: { achievementId: string | nul
           />
         </AdminCard>
 
-        {/* Award image */}
+        {/* Award image — deferred upload */}
         <AdminCard>
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
             Award Image (optional)
           </h2>
           <ImageUpload
             label="Upload an award photo or certificate"
-            hint="Recommended: square or landscape, under 2 MB"
-            value={form.image || null}
-            onChange={(url) => set('image', url ?? '')}
+            hint="Recommended: square or landscape, under 2 MB. Uploaded when you save."
+            value={form.imageValue}
+            onChange={(val) => set('imageValue', val)}
           />
         </AdminCard>
 
@@ -214,9 +255,9 @@ function AchievementFormContent({ achievementId }: { achievementId: string | nul
         </AdminCard>
 
         <div className="flex justify-end">
-          <AdminButton loading={saving} type="submit">
+          <AdminButton loading={saving} type="submit" disabled={saving}>
             <Save size={14} aria-hidden="true" />
-            {isNew ? 'Create achievement' : 'Save changes'}
+            {saving ? 'Saving…' : isNew ? 'Create achievement' : 'Save changes'}
           </AdminButton>
         </div>
       </form>

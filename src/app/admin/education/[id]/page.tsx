@@ -4,16 +4,21 @@
 //  Education create / edit form
 //  Route: /admin/education/new  →  create
 //         /admin/education/:id  →  edit
+//
+//  Deferred-upload flow:
+//   Create → adminEducation.create → get id → reconcileSingleMedia
+//   Update → adminEducation.update → reconcileSingleMedia
 // ============================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { adminEducation } from '@/lib/admin-api';
+import { reconcileSingleMedia } from '@/lib/media-save';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
-import { ImageUpload } from '@/components/admin/image-upload';
+import { ImageUpload, type ImageValue } from '@/components/admin/image-upload';
 import {
   AdminInput,
   AdminToggle,
@@ -24,8 +29,8 @@ import {
 import { DatePicker } from '@/components/admin/date-picker';
 
 // ── Form state ─────────────────────────────────────────────────
-// `ongoing` is a UI-only flag; serialises to endDate: null when true.
-// startDate / endDate are stored as YYYY-MM-DD strings (what <input type="date"> uses).
+// `ongoing` is UI-only; serialises to endDate: null when true.
+// `logoValue` holds the current ImageValue (existing or pending).
 
 interface FormState {
   degree: string;
@@ -35,7 +40,7 @@ interface FormState {
   endDate: string;
   ongoing: boolean;
   order: number;
-  logo: string;
+  logoValue: ImageValue | null;
 }
 
 const EMPTY_FORM: FormState = {
@@ -46,7 +51,7 @@ const EMPTY_FORM: FormState = {
   endDate: '',
   ongoing: false,
   order: 0,
-  logo: '',
+  logoValue: null,
 };
 
 function EducationFormContent({ educationId }: { educationId: string | null }) {
@@ -57,24 +62,29 @@ function EducationFormContent({ educationId }: { educationId: string | null }) {
   const [saving, setSaving] = useState(false);
   const isNew = !educationId;
 
-  // Load existing education entry by id
+  // Track the original mediaId so we can delete it if replaced/removed.
+  const originalMediaIdRef = useRef<string | null>(null);
+
   useEffect(() => {
     if (!educationId) return;
     setLoading(true);
     adminEducation
       .get(educationId)
       .then((edu) => {
+        const logoValue: ImageValue | null =
+          edu.logoMediaId && edu.logo
+            ? { mediaId: edu.logoMediaId, url: edu.logo }
+            : null;
+        originalMediaIdRef.current = edu.logoMediaId ?? null;
         setForm({
           degree: edu.degree,
           school: edu.school,
           detail: edu.detail ?? '',
-          // API may return a full ISO datetime — slice to YYYY-MM-DD for the date input
           startDate: edu.startDate ? edu.startDate.slice(0, 10) : '',
           endDate: edu.endDate ? edu.endDate.slice(0, 10) : '',
-          // endDate === null means "Ongoing / currently studying"
           ongoing: edu.endDate === null,
           order: edu.order,
-          logo: edu.logo ?? '',
+          logoValue,
         });
       })
       .catch((err) =>
@@ -83,7 +93,6 @@ function EducationFormContent({ educationId }: { educationId: string | null }) {
       .finally(() => setLoading(false));
   }, [educationId, toastError]);
 
-  // Prefill order for brand-new entry: max(existing) + 1
   useEffect(() => {
     if (educationId) return;
     adminEducation
@@ -121,17 +130,50 @@ function EducationFormContent({ educationId }: { educationId: string | null }) {
         detail: form.detail.trim() || undefined,
         order: form.order,
         startDate: form.startDate,
-        // ongoing toggle → null; otherwise use the YYYY-MM-DD value (or null if empty)
         endDate: form.ongoing ? null : (form.endDate || null),
-        logo: form.logo || null,
       };
+
+      let ownerId: string;
+
       if (isNew) {
         const created = await adminEducation.create(payload);
-        success('Education created.');
+        ownerId = created.id;
+        const errors = await reconcileSingleMedia({
+          value: form.logoValue,
+          originalMediaId: null,
+          ownerId,
+          ownerType: 'education',
+          category: 'Raw',
+        });
+        if (errors.length > 0) {
+          toastError(`Education created, but logo upload failed: ${errors.join('; ')}`);
+        } else {
+          success('Education created.');
+        }
         router.replace(`/admin/education/${created.id}`);
       } else {
         await adminEducation.update(educationId!, payload);
-        success('Education saved.');
+        ownerId = educationId!;
+        const errors = await reconcileSingleMedia({
+          value: form.logoValue,
+          originalMediaId: originalMediaIdRef.current,
+          ownerId,
+          ownerType: 'education',
+          category: 'Raw',
+        });
+        if (errors.length > 0) {
+          toastError(`Saved, but logo update had issues: ${errors.join('; ')}`);
+        } else {
+          success('Education saved.');
+        }
+        // Refresh to get updated logo info.
+        const refreshed = await adminEducation.get(educationId!);
+        originalMediaIdRef.current = refreshed.logoMediaId ?? null;
+        const logoValue: ImageValue | null =
+          refreshed.logoMediaId && refreshed.logo
+            ? { mediaId: refreshed.logoMediaId, url: refreshed.logo }
+            : null;
+        setForm((f) => ({ ...f, logoValue }));
       }
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Save failed.');
@@ -154,7 +196,7 @@ function EducationFormContent({ educationId }: { educationId: string | null }) {
       actions={
         <AdminButton loading={saving} onClick={handleSubmit} type="button">
           <Save size={14} aria-hidden="true" />
-          {isNew ? 'Create education' : 'Save changes'}
+          {saving ? 'Saving…' : isNew ? 'Create education' : 'Save changes'}
         </AdminButton>
       }
     >
@@ -197,13 +239,13 @@ function EducationFormContent({ educationId }: { educationId: string | null }) {
               className="sm:col-span-2"
             />
           </div>
-          {/* Institution logo — optional */}
+          {/* Institution logo — deferred upload */}
           <div className="mt-4">
             <ImageUpload
               label="Institution logo (optional)"
-              hint="Recommended: square PNG/SVG, min 80×80. Stored via Cloudinary."
-              value={form.logo || null}
-              onChange={(url) => set('logo', url ?? '')}
+              hint="Recommended: square PNG/SVG, min 80×80. Uploaded when you save."
+              value={form.logoValue}
+              onChange={(val) => set('logoValue', val)}
             />
           </div>
         </AdminCard>
@@ -251,9 +293,9 @@ function EducationFormContent({ educationId }: { educationId: string | null }) {
         </AdminCard>
 
         <div className="flex justify-end">
-          <AdminButton loading={saving} type="submit">
+          <AdminButton loading={saving} type="submit" disabled={saving}>
             <Save size={14} aria-hidden="true" />
-            {isNew ? 'Create education' : 'Save changes'}
+            {saving ? 'Saving…' : isNew ? 'Create education' : 'Save changes'}
           </AdminButton>
         </div>
       </form>

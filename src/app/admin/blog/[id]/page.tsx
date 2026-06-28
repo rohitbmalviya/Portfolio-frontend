@@ -2,14 +2,20 @@
 
 // ============================================================
 //  Blog post create / edit form
+//
+//  Deferred-upload flow:
+//   Create → adminBlog.create → get id → reconcileMultiMedia
+//   Update → adminBlog.update → reconcileMultiMedia
+//  images[0] becomes the cover (handled by the backend).
 // ============================================================
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { ArrowLeft, Save } from 'lucide-react';
 import Link from 'next/link';
 import { adminBlog } from '@/lib/admin-api';
-import type { BlogPost } from '@/lib/types';
+import { reconcileMultiMedia } from '@/lib/media-save';
+import { MediaCategory } from '@/lib/media';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
 import {
@@ -21,16 +27,26 @@ import {
   TagsInput,
   LoadingRows,
 } from '@/components/admin/ui';
-import { ImageUpload } from '@/components/admin/image-upload';
-import { MediaCategory } from '@/lib/media';
+import { MultiImageUpload, type ImageValue } from '@/components/admin/image-upload';
 
-type FormState = Omit<BlogPost, 'id' | 'createdAt' | 'updatedAt' | 'publishedAt'>;
+// ── Form state ─────────────────────────────────────────────────
+
+interface FormState {
+  slug: string;
+  title: string;
+  excerpt: string;
+  images: ImageValue[];
+  tags: string[];
+  body: string;
+  readingTime: number | null;
+  published: boolean;
+}
 
 const EMPTY: FormState = {
   slug: '',
   title: '',
   excerpt: '',
-  coverImage: '',
+  images: [],
   tags: [],
   body: '',
   readingTime: null,
@@ -45,17 +61,28 @@ function BlogFormContent({ postId }: { postId: string | null }) {
   const [saving, setSaving] = useState(false);
   const isNew = !postId;
 
+  // Track originalMediaIds to detect additions/removals on update.
+  const originalMediaIdsRef = useRef<string[]>([]);
+
   useEffect(() => {
     if (!postId) return;
     setLoading(true);
     adminBlog
       .get(postId)
       .then((p) => {
+        const existingImages: ImageValue[] = (p.images ?? []).map((img) => ({
+          mediaId: img.mediaId,
+          url: img.url,
+          alt: img.alt ?? '',
+        }));
+        originalMediaIdsRef.current = existingImages.map((img) =>
+          'mediaId' in img ? img.mediaId : '',
+        );
         setForm({
           slug: p.slug,
           title: p.title,
           excerpt: p.excerpt,
-          coverImage: p.coverImage ?? '',
+          images: existingImages,
           tags: p.tags ?? [],
           body: p.body,
           readingTime: p.readingTime ?? null,
@@ -78,17 +105,55 @@ function BlogFormContent({ postId }: { postId: string | null }) {
     }
     setSaving(true);
     try {
-      const payload = {
-        ...form,
-        coverImage: form.coverImage || undefined,
-      };
+      const { images, ...rest } = form;
+      const payload = { ...rest };
+
+      let ownerId: string;
+
       if (isNew) {
         const created = await adminBlog.create(payload);
-        success('Post created.');
+        ownerId = created.id;
+        const errors = await reconcileMultiMedia({
+          values: images,
+          originalMediaIds: [],
+          ownerId,
+          ownerType: 'blog',
+          category: MediaCategory.Blogs,
+          entitySlug: form.slug,
+        });
+        if (errors.length > 0) {
+          toastError(`Post created, but some images failed: ${errors.join('; ')}`);
+        } else {
+          success('Post created.');
+        }
         router.replace(`/admin/blog/${created.id}`);
       } else {
         await adminBlog.update(postId!, payload);
-        success('Post saved.');
+        ownerId = postId!;
+        const errors = await reconcileMultiMedia({
+          values: images,
+          originalMediaIds: originalMediaIdsRef.current,
+          ownerId,
+          ownerType: 'blog',
+          category: MediaCategory.Blogs,
+          entitySlug: form.slug,
+        });
+        if (errors.length > 0) {
+          toastError(`Saved, but some images failed: ${errors.join('; ')}`);
+        } else {
+          success('Post saved.');
+        }
+        // Refresh to reflect server state.
+        const refreshed = await adminBlog.get(postId!);
+        const refreshedImages: ImageValue[] = (refreshed.images ?? []).map((img) => ({
+          mediaId: img.mediaId,
+          url: img.url,
+          alt: img.alt ?? '',
+        }));
+        originalMediaIdsRef.current = refreshedImages.map((img) =>
+          'mediaId' in img ? img.mediaId : '',
+        );
+        setForm((f) => ({ ...f, images: refreshedImages }));
       }
     } catch (err) {
       toastError(err instanceof Error ? err.message : 'Save failed.');
@@ -111,7 +176,7 @@ function BlogFormContent({ postId }: { postId: string | null }) {
       actions={
         <AdminButton loading={saving} onClick={handleSubmit} type="button">
           <Save size={14} aria-hidden="true" />
-          {isNew ? 'Create post' : 'Save changes'}
+          {saving ? 'Saving…' : isNew ? 'Create post' : 'Save changes'}
         </AdminButton>
       }
     >
@@ -173,14 +238,18 @@ function BlogFormContent({ postId }: { postId: string | null }) {
 
         <AdminCard>
           <h2 className="text-[14px] font-semibold mb-4" style={{ color: 'var(--text)' }}>
-            Cover Image
+            Images
           </h2>
-          <ImageUpload
+          <p className="text-[12px] mb-3" style={{ color: 'var(--muted)' }}>
+            The first image becomes the cover. Recommended: 1200×630 px.
+            Images are uploaded when you save. Reorder with the arrows on hover.
+          </p>
+          <MultiImageUpload
             category={MediaCategory.Blogs}
-            value={form.coverImage ?? null}
-            onChange={(url) => set('coverImage', url ?? '')}
-            hint="Recommended: 1200×630px"
+            value={form.images}
+            onChange={(items) => set('images', items)}
             entitySlug={form.slug}
+            max={4}
           />
         </AdminCard>
 
@@ -209,9 +278,9 @@ function BlogFormContent({ postId }: { postId: string | null }) {
         </AdminCard>
 
         <div className="flex justify-end">
-          <AdminButton loading={saving} type="submit">
+          <AdminButton loading={saving} type="submit" disabled={saving}>
             <Save size={14} aria-hidden="true" />
-            {isNew ? 'Create post' : 'Save changes'}
+            {saving ? 'Saving…' : isNew ? 'Create post' : 'Save changes'}
           </AdminButton>
         </div>
       </form>

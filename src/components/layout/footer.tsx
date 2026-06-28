@@ -1,32 +1,30 @@
 // ============================================================
 //  Footer — mono text, centered, nav links + socials.
-//  Social links and email are sourced solely from SiteSettings.
-//  When settings return no socials the icons row renders nothing.
+//  Nav links come from the SAME source as the navbar
+//  (GET /api/pages/nav, passed as `navItems`). Social links and
+//  email are sourced solely from SiteSettings.
 //  Server component.
 // ============================================================
 
 import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { CONTACT_LINK_ICON_MAP } from '@/lib/contact-link-types';
+import { navLinksFromPages } from '@/lib/nav-links';
 import { SITE_OWNER } from '@/lib/site';
 import { normalizeSocials } from '@/lib/socials';
-import type { SiteSettings } from '@/lib/types';
-
-const FOOTER_LINKS = [
-  { label: 'about', href: '/#about' },
-  { label: 'work', href: '/#work' },
-  { label: 'blog', href: '/blog' },
-  { label: 'contact', href: '/#contact' },
-];
+import type { NavPage, SiteSettings } from '@/lib/types';
 
 // ── Component ─────────────────────────────────────────────────
 
 interface FooterProps {
+  /** Pre-fetched nav pages (GET /api/pages/nav) — same source as the navbar. */
+  navItems?: NavPage[];
   /** Passed from the public layout after fetching getSiteSettings(). */
   settings?: SiteSettings | null;
 }
 
-export function Footer({ settings }: FooterProps) {
+export function Footer({ navItems, settings }: FooterProps) {
+  const navLinks = navLinksFromPages(navItems ?? []);
   // Build social links solely from SiteSettings — backend is the single source of truth.
   // If settings are absent or have no socials, the array is empty and no icons render.
   const socialLinks = (() => {
@@ -52,10 +50,11 @@ export function Footer({ settings }: FooterProps) {
   return (
     <footer className="border-t border-[--border] py-10">
       <div className="wrap flex flex-col items-center gap-5 text-[--muted] font-mono text-[13px]">
-        {/* Nav links */}
+        {/* Nav links — same source as the navbar (GET /api/pages/nav) */}
+        {navLinks.length > 0 && (
         <nav aria-label="Footer navigation">
           <ul className="flex flex-wrap justify-center gap-5 list-none">
-            {FOOTER_LINKS.map((l) => (
+            {navLinks.map((l) => (
               <li key={l.href}>
                 <Link
                   href={l.href}
@@ -67,6 +66,7 @@ export function Footer({ settings }: FooterProps) {
             ))}
           </ul>
         </nav>
+        )}
 
         {/* Social icons */}
         <div className="flex items-center gap-4">

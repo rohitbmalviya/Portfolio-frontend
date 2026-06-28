@@ -154,7 +154,7 @@ export default async function BlogPostPage({ params }: Props) {
             </div>
           ) : (
             <div className="bg-[--surface] border border-[--border] rounded-[12px] p-8 text-center">
-              <p className="font-mono text-[--muted] text-[13px] mb-2">// full post coming soon</p>
+              <p className="font-mono text-[--muted] text-[13px] mb-2">{'// full post coming soon'}</p>
               <p className="text-[--muted] text-[14px]">
                 This post is being drafted. Check back shortly.
               </p>

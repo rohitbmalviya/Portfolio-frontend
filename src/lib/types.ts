@@ -35,6 +35,19 @@ export interface MediaItem {
   alt: string;
 }
 
+/** A normalized media record returned by the backend Media table. */
+export interface Media {
+  id: string;
+  cloudinaryUrl: string;
+  publicId?: string;
+  alt?: string | null;
+  width?: number | null;
+  height?: number | null;
+  type?: string | null;
+  category?: string;
+  createdAt?: string;
+}
+
 // ── Page + Section ────────────────────────────────────────────
 
 export interface Page {
@@ -44,6 +57,7 @@ export interface Page {
   metaTitle?: string | null;
   metaDescription?: string | null;
   ogImage?: string | null;
+  ogImageMediaId?: string | null;
   navLabel?: string | null;
   navOrder: number;
   showInNav: boolean;
@@ -232,7 +246,8 @@ export interface Project {
   stack: string[];
   metric: string;
   liveUrl?: string | null;
-  screenshots: MediaItem[];
+  /** Read shape: normalized media records (id + url + optional alt). */
+  screenshots: { mediaId: string; url: string; alt?: string }[];
   overview: string;
   contribution: string;
   body: string;
@@ -250,7 +265,10 @@ export interface BlogPost {
   slug: string;
   title: string;
   excerpt: string;
+  /** Convenience alias: images[0]?.url — returned by the API for backward compat. */
   coverImage?: string | null;
+  /** All attached images in display order (first = cover). */
+  images: { mediaId: string; url: string; alt?: string }[];
   tags: string[];
   body: string;
   readingTime?: number | null;
@@ -288,8 +306,10 @@ export interface Experience {
   endDate: string | null;
   bullets: string[];
   order: number;
-  /** Optional Cloudinary URL for the company logo */
+  /** Display URL for the company logo (derived from the Media record). */
   logo?: string | null;
+  /** Media record ID used for writes. */
+  logoMediaId?: string | null;
 }
 
 export interface Education {
@@ -300,8 +320,10 @@ export interface Education {
   endDate: string | null;
   detail?: string;
   order: number;
-  /** Optional Cloudinary URL for the institution logo */
+  /** Display URL for the institution logo (derived from the Media record). */
   logo?: string | null;
+  /** Media record ID used for writes. */
+  logoMediaId?: string | null;
 }
 
 // ── Achievement ───────────────────────────────────────────────
@@ -311,7 +333,10 @@ export interface Achievement {
   title: string;
   description: string;
   date: string | null;
+  /** Display URL for the award image (derived from the Media record). */
   image?: string | null;
+  /** Media record ID used for writes. */
+  imageMediaId?: string | null;
   order: number;
 }
 
@@ -329,12 +354,19 @@ export interface SiteSettings {
   email: string;
   location: string;
   socials: SocialLink[];
+  /** Display URL for the résumé PDF (derived from the Media record). */
   resumeUrl?: string | null;
+  /** Media record ID for the résumé — used for writes. */
+  resumeMediaId?: string | null;
   defaultTheme: DefaultTheme;
   brandAccent?: string | null;
   footerText?: string | null;
   ogTitle?: string | null;
   ogDescription?: string | null;
+  /** Display URL for the default OG image (derived from the Media record). */
+  ogImage?: string | null;
+  /** Media record ID for the default OG image — used for writes. */
+  ogImageMediaId?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { Menu, X } from 'lucide-react';
 import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
+import { navLinksFromPages } from '@/lib/nav-links';
 import { SITE_OWNER } from '@/lib/site';
 import type { NavPage } from '@/lib/types';
 
@@ -26,11 +27,10 @@ interface NavLink {
 }
 
 function toNavLinks(pages: NavPage[]): NavLink[] {
-  return pages.map((p, i) => ({
+  // Shared label/href logic (also used by the footer); the navbar adds a number.
+  return navLinksFromPages(pages).map((l, i) => ({
     num: String(i + 1).padStart(2, '0'),
-    // Render navLabel if set, otherwise fall back to title; lowercase for style consistency
-    label: (p.navLabel ?? p.title).toLowerCase(),
-    href: p.slug === 'home' ? '/' : `/${p.slug}`,
+    ...l,
   }));
 }
 
