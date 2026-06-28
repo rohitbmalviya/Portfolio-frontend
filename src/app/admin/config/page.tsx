@@ -101,13 +101,13 @@ function ConfigCard({ config, saving, onItemsChange, onSave }: ConfigCardProps) 
             >
               <AdminInput
                 placeholder="e.g. github"
-                value={item.value}
+                value={item.value ?? ''}
                 aria-label={`Option ${i + 1} value`}
                 onChange={(e) => updateItem(i, { value: e.target.value })}
               />
               <AdminInput
                 placeholder="e.g. GitHub"
-                value={item.label}
+                value={item.label ?? ''}
                 aria-label={`Option ${i + 1} label`}
                 onChange={(e) => updateItem(i, { label: e.target.value })}
               />

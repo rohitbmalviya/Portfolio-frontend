@@ -13,7 +13,6 @@ import type {
   Section,
   SectionData,
   SectionType,
-  PageType,
   Project,
   BlogPost,
   Skill,
@@ -69,8 +68,8 @@ export interface MeResponse {
 
 export type CreatePagePayload = Pick<
   Page,
-  'slug' | 'title' | 'type'
-> & Partial<Omit<Page, 'id' | 'slug' | 'title' | 'type' | 'sections' | '_count' | 'createdAt' | 'updatedAt'>>;
+  'slug' | 'title'
+> & Partial<Omit<Page, 'id' | 'slug' | 'title' | 'sections' | '_count' | 'createdAt' | 'updatedAt'>>;
 
 export type UpdatePagePayload = Partial<CreatePagePayload>;
 
@@ -596,4 +595,4 @@ export const adminContact = {
 
 // ── Helpers re-exported for convenience ───────────────────────
 
-export type { PageType, SectionType, ConfigOption, Configuration, ContactMessage, ContactThread };
+export type { SectionType, ConfigOption, Configuration, ContactMessage, ContactThread };

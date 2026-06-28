@@ -11,7 +11,8 @@
 import { useEffect, useState } from 'react';
 import { Plus, Wrench, ChevronUp, ChevronDown, Pencil, Trash2, Save, X } from 'lucide-react';
 import { adminSkills } from '@/lib/admin-api';
-import { SKILL_GROUP_OPTIONS } from '@/lib/skill-groups';
+import { getConfigOptions } from '@/lib/api';
+import type { ConfigOption } from '@/lib/api';
 import type { Skill, SkillGroup, SkillLevel, SkillGroupSection } from '@/lib/types';
 import { SkillIcon } from '@/components/ui/skill-icon';
 import { AdminShell } from '@/components/admin/admin-shell';
@@ -49,7 +50,7 @@ interface EditingSkill {
 
 const EMPTY_EDIT: EditingSkill = {
   name: '',
-  group: 'LANGUAGES',
+  group: '',
   level: 'PROFICIENT',
   order: 0,
 };
@@ -62,6 +63,12 @@ function SkillsContent() {
   const [saving, setSaving] = useState(false);
   const [deleteTarget, setDeleteTarget] = useState<Skill | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [groupOptions, setGroupOptions] = useState<ConfigOption[]>([]);
+
+  // Load skill group options from the DB-driven config key.
+  useEffect(() => {
+    getConfigOptions('skill_groups').then(setGroupOptions);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Total skill count across all groups — used as the `order` value for new skills.
   const totalSkills = sections.reduce((sum, s) => sum + s.skills.length, 0);
@@ -156,7 +163,15 @@ function SkillsContent() {
       title="Skills"
       description="Manage skill groups, levels and order."
       actions={
-        <AdminButton onClick={() => setEditing({ ...EMPTY_EDIT, order: totalSkills })}>
+        <AdminButton
+          onClick={() =>
+            setEditing({
+              ...EMPTY_EDIT,
+              group: groupOptions[0]?.value ?? '',
+              order: totalSkills,
+            })
+          }
+        >
           <Plus size={14} aria-hidden="true" /> Add skill
         </AdminButton>
       }
@@ -178,7 +193,7 @@ function SkillsContent() {
               label="Group"
               value={editing.group}
               onChange={(e) => setEditing({ ...editing, group: e.target.value as SkillGroup })}
-              options={SKILL_GROUP_OPTIONS}
+              options={groupOptions}
             />
             <AdminSelect
               label="Level"
@@ -206,7 +221,11 @@ function SkillsContent() {
           icon={<Wrench size={20} />}
           title="No skills yet"
           action={
-            <AdminButton onClick={() => setEditing({ ...EMPTY_EDIT })}>
+            <AdminButton
+              onClick={() =>
+                setEditing({ ...EMPTY_EDIT, group: groupOptions[0]?.value ?? '' })
+              }
+            >
               <Plus size={14} /> Add first skill
             </AdminButton>
           }

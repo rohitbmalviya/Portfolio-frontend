@@ -35,7 +35,7 @@ function PagesContent() {
   const [deleteTarget, setDeleteTarget] = useState<Page | null>(null);
   const [deleting, setDeleting] = useState(false);
 
-  // Create form state — type is always 'CUSTOM'
+  // Create form state
   const [newTitle, setNewTitle] = useState('');
   const [newSlug, setNewSlug] = useState('');
   const [newMetaTitle, setNewMetaTitle] = useState('');
@@ -88,7 +88,6 @@ function PagesContent() {
       const payload: CreatePagePayload = {
         slug: newSlug.trim(),
         title: newTitle.trim(),
-        type: 'CUSTOM',
         // Omit nullable strings when empty so the backend keeps its own defaults
         ...(newMetaTitle.trim() ? { metaTitle: newMetaTitle.trim() } : {}),
         ...(newMetaDescription.trim() ? { metaDescription: newMetaDescription.trim() } : {}),
@@ -170,7 +169,6 @@ function PagesContent() {
                   >
                     {page.title}
                   </Link>
-                  <AdminBadge variant="muted">{page.type}</AdminBadge>
                   {page.published ? (
                     <AdminBadge variant="success">Published</AdminBadge>
                   ) : (

@@ -5,16 +5,6 @@
 
 // ── Enums ─────────────────────────────────────────────────────
 
-export type PageType =
-  | 'HOME'
-  | 'PROJECTS'
-  | 'PROJECT_DETAIL'
-  | 'BLOG'
-  | 'BLOG_POST'
-  | 'ABOUT'
-  | 'CONTACT'
-  | 'CUSTOM';
-
 export type SectionType =
   | 'HERO'
   | 'ABOUT'
@@ -31,13 +21,8 @@ export type SectionType =
   | 'CTA'
   | 'GALLERY';
 
-export type SkillGroup =
-  | 'LANGUAGES'
-  | 'FRONTEND'
-  | 'BACKEND'
-  | 'DATA'
-  | 'CLOUD_DEVOPS'
-  | 'AI';
+/** DB-driven skill group — arbitrary string defined in the skill_groups Config key. */
+export type SkillGroup = string;
 
 export type SkillLevel = 'EXPERT' | 'PROFICIENT' | 'FAMILIAR';
 
@@ -56,7 +41,6 @@ export interface Page {
   id: string;
   slug: string;
   title: string;
-  type: PageType;
   metaTitle?: string | null;
   metaDescription?: string | null;
   ogImage?: string | null;

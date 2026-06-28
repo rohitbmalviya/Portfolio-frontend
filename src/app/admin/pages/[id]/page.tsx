@@ -28,7 +28,7 @@ import {
   X,
 } from 'lucide-react';
 import { adminPages, adminSections } from '@/lib/admin-api';
-import type { Page, Section, SectionType, SectionData, PageType } from '@/lib/types';
+import type { Page, Section, SectionType, SectionData } from '@/lib/types';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
 import {
@@ -65,23 +65,11 @@ const SECTION_TYPE_OPTIONS: { value: SectionType; label: string }[] = [
   { value: 'GALLERY', label: 'Gallery' },
 ];
 
-const PAGE_TYPE_OPTIONS: { value: PageType; label: string }[] = [
-  { value: 'HOME', label: 'Home' },
-  { value: 'PROJECTS', label: 'Projects' },
-  { value: 'PROJECT_DETAIL', label: 'Project Detail' },
-  { value: 'BLOG', label: 'Blog' },
-  { value: 'BLOG_POST', label: 'Blog Post' },
-  { value: 'ABOUT', label: 'About' },
-  { value: 'CONTACT', label: 'Contact' },
-  { value: 'CUSTOM', label: 'Custom' },
-];
-
 // ── Page settings form type ───────────────────────────────────
 
 interface PageSettingsForm {
   title: string;
   slug: string;
-  type: PageType;
   metaTitle: string;
   metaDescription: string;
   ogImage: string | null;
@@ -96,7 +84,6 @@ function pageToForm(p: Page): PageSettingsForm {
   return {
     title: p.title,
     slug: p.slug,
-    type: p.type,
     metaTitle: p.metaTitle ?? '',
     metaDescription: p.metaDescription ?? '',
     ogImage: p.ogImage ?? null,
@@ -292,7 +279,6 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
   const [settingsForm, setSettingsForm] = useState<PageSettingsForm>({
     title: '',
     slug: '',
-    type: 'CUSTOM',
     metaTitle: '',
     metaDescription: '',
     ogImage: null,
@@ -400,7 +386,6 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
       const updated = await adminPages.update(pageId, {
         title: settingsForm.title,
         slug: settingsForm.slug,
-        type: settingsForm.type,
         metaTitle: settingsForm.metaTitle || null,
         metaDescription: settingsForm.metaDescription || null,
         ogImage: settingsForm.ogImage,
@@ -712,21 +697,13 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
               />
             </div>
 
-            {/* Type + Nav label */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              <AdminSelect
-                label="Page type"
-                value={settingsForm.type}
-                onChange={(e) => updateSetting('type', e.target.value as PageType)}
-                options={PAGE_TYPE_OPTIONS}
-              />
-              <AdminInput
-                label="Nav label"
-                value={settingsForm.navLabel}
-                onChange={(e) => updateSetting('navLabel', e.target.value)}
-                placeholder="Label shown in navigation"
-              />
-            </div>
+            {/* Nav label */}
+            <AdminInput
+              label="Nav label"
+              value={settingsForm.navLabel}
+              onChange={(e) => updateSetting('navLabel', e.target.value)}
+              placeholder="Label shown in navigation"
+            />
 
             {/* Nav order (half-width) */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
