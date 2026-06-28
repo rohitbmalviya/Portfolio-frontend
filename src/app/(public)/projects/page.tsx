@@ -4,26 +4,19 @@
 // ============================================================
 
 import type { Metadata } from 'next';
-import { getProjects } from '@/lib/api';
-import { FALLBACK_PROJECTS } from '@/lib/fallback-data';
+import { getPage, getProjects, getSiteSettings } from '@/lib/api';
 import { ProjectCard } from '@/components/sections/project-card';
-import { SITE_OWNER } from '@/lib/site';
+import { buildPageMetadata } from '@/lib/seo';
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
-  title: 'Projects',
-  description:
-    'All 8 production projects — from a bank-grade Monte Carlo engine for Siam Commercial Bank to a multi-tenant AI hiring SaaS.',
-  openGraph: {
-    title: `Projects — ${SITE_OWNER}`,
-    description: 'Production-grade systems across fintech, hiring, real-estate & AI.',
-  },
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const [page, settings] = await Promise.all([getPage('projects'), getSiteSettings()]);
+  return buildPageMetadata({ page, settings, fallbackTitle: 'Projects' });
+}
 
 export default async function ProjectsPage() {
-  let projects = await getProjects();
-  if (projects.length === 0) projects = FALLBACK_PROJECTS;
+  const projects = await getProjects();
 
   return (
     <div className="py-16">

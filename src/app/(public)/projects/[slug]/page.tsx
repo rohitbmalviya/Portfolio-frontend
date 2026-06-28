@@ -14,7 +14,6 @@ import rehypeSlug from 'rehype-slug';
 import rehypeHighlight from 'rehype-highlight';
 import { ExternalLink, ArrowLeft } from 'lucide-react';
 import { getProject, getProjects } from '@/lib/api';
-import { FALLBACK_PROJECTS } from '@/lib/fallback-data';
 import { Tag } from '@/components/ui/tag';
 import { LinkButton } from '@/components/ui/button';
 import { SITE_OWNER } from '@/lib/site';
@@ -26,7 +25,7 @@ interface Props {
 }
 
 export async function generateStaticParams() {
-  const projects = await getProjects().catch(() => FALLBACK_PROJECTS);
+  const projects = await getProjects();
   return projects.map((p) => ({ slug: p.slug }));
 }
 
@@ -50,12 +49,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function ProjectDetailPage({ params }: Props) {
   const { slug } = await params;
-  let project = await getProject(slug);
-
-  // Fallback to static data if API is down
-  if (!project) {
-    project = FALLBACK_PROJECTS.find((p) => p.slug === slug) ?? null;
-  }
+  const project = await getProject(slug);
 
   if (!project) notFound();
 

@@ -1,7 +1,7 @@
 // ============================================================
 //  Footer — mono text, centered, nav links + socials.
-//  Social links and email are sourced from SiteSettings when
-//  available; falls back to DEFAULT_SOCIAL_LINKS when null.
+//  Social links and email are sourced solely from SiteSettings.
+//  When settings return no socials the icons row renders nothing.
 //  Server component.
 // ============================================================
 
@@ -9,28 +9,8 @@ import Link from 'next/link';
 import { ExternalLink } from 'lucide-react';
 import { CONTACT_LINK_ICON_MAP } from '@/lib/contact-link-types';
 import { SITE_OWNER } from '@/lib/site';
+import { normalizeSocials } from '@/lib/socials';
 import type { SiteSettings } from '@/lib/types';
-
-// ── Static fallback (used when settings are null) ─────────────
-
-/** Default social links when SiteSettings cannot be fetched. */
-const DEFAULT_SOCIAL_LINKS = [
-  {
-    label: 'GitHub',
-    href: 'https://github.com/rohithumancloud',
-    icon: CONTACT_LINK_ICON_MAP['github'] ?? ExternalLink,
-  },
-  {
-    label: 'LinkedIn',
-    href: 'https://linkedin.com/in/rohitbmalviya',
-    icon: CONTACT_LINK_ICON_MAP['linkedin'] ?? ExternalLink,
-  },
-  {
-    label: 'Email',
-    href: `mailto:${process.env.NEXT_PUBLIC_CONTACT_EMAIL ?? 'rohitbmalviya@gmail.com'}`,
-    icon: CONTACT_LINK_ICON_MAP['email'] ?? ExternalLink,
-  },
-];
 
 const FOOTER_LINKS = [
   { label: 'about', href: '/#about' },
@@ -47,12 +27,12 @@ interface FooterProps {
 }
 
 export function Footer({ settings }: FooterProps) {
-  // Build social links from SiteSettings when available.
-  // Include the primary email as a link if it isn't already listed in socials.
+  // Build social links solely from SiteSettings — backend is the single source of truth.
+  // If settings are absent or have no socials, the array is empty and no icons render.
   const socialLinks = (() => {
-    if (!settings || settings.socials.length === 0) return DEFAULT_SOCIAL_LINKS;
+    const socials = normalizeSocials(settings?.socials);
 
-    const links = settings.socials.map((s) => {
+    const links = socials.map((s) => {
       const Icon = CONTACT_LINK_ICON_MAP[s.type] ?? ExternalLink;
       const href = s.type === 'email' ? `mailto:${s.value}` : s.value;
       const label = s.type.charAt(0).toUpperCase() + s.type.slice(1);
@@ -60,8 +40,8 @@ export function Footer({ settings }: FooterProps) {
     });
 
     // Append email link from settings.email only if not already present in socials.
-    const hasEmail = settings.socials.some((s) => s.type === 'email');
-    if (!hasEmail && settings.email) {
+    const hasEmail = socials.some((s) => s.type === 'email');
+    if (!hasEmail && settings?.email) {
       const MailIcon = CONTACT_LINK_ICON_MAP['email'] ?? ExternalLink;
       links.push({ label: 'Email', href: `mailto:${settings.email}`, icon: MailIcon });
     }

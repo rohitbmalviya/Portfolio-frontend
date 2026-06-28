@@ -10,6 +10,7 @@ import { adminSettings, adminMedia } from '@/lib/admin-api';
 import type { SiteSettings, SocialLink, DefaultTheme } from '@/lib/types';
 import { getConfigOptions } from '@/lib/api';
 import type { ConfigOption } from '@/lib/api';
+import { normalizeSocials } from '@/lib/socials';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
 import {
@@ -21,19 +22,6 @@ import {
 } from '@/components/admin/ui';
 
 type FormState = Omit<SiteSettings, 'id' | 'createdAt' | 'updatedAt'>;
-
-const SOCIAL_TYPE_OPTIONS: ConfigOption[] = [
-  { value: 'website', label: 'Website' },
-  { value: 'linkedin', label: 'LinkedIn' },
-  { value: 'github', label: 'GitHub' },
-  { value: 'twitter', label: 'X (Twitter)' },
-  { value: 'instagram', label: 'Instagram' },
-  { value: 'youtube', label: 'YouTube' },
-  { value: 'medium', label: 'Medium' },
-  { value: 'dribbble', label: 'Dribbble' },
-  { value: 'telegram', label: 'Telegram' },
-  { value: 'email', label: 'Email' },
-];
 
 const EMPTY: FormState = {
   name: '',
@@ -49,18 +37,6 @@ const EMPTY: FormState = {
   ogDescription: '',
 };
 
-// Backward-compat: older settings stored socials as a map { github, linkedin, … }.
-// Convert any non-array shape to the new { type, value }[] list.
-function normalizeSocials(raw: unknown): SocialLink[] {
-  if (Array.isArray(raw)) return raw as SocialLink[];
-  if (raw && typeof raw === 'object') {
-    return Object.entries(raw as Record<string, string>)
-      .filter(([, v]) => Boolean(v))
-      .map(([type, value]) => ({ type, value }));
-  }
-  return [];
-}
-
 function SettingsContent() {
   const { success, error: toastError } = useToast();
   const [form, setForm] = useState<FormState>(EMPTY);
@@ -68,12 +44,12 @@ function SettingsContent() {
   const [saving, setSaving] = useState(false);
   const [uploadingResume, setUploadingResume] = useState(false);
   const resumeInputRef = useRef<HTMLInputElement>(null);
-  const [socialTypeOptions, setSocialTypeOptions] = useState<ConfigOption[]>(SOCIAL_TYPE_OPTIONS);
+  const [socialTypeOptions, setSocialTypeOptions] = useState<ConfigOption[]>([]);
 
-  // Load social link types from config API; fall back to the hardcoded constant if empty.
+  // Load social link types from config API — backend is the sole source of truth.
   useEffect(() => {
     getConfigOptions('social_link_types').then((opts) => {
-      if (opts.length > 0) setSocialTypeOptions(opts);
+      setSocialTypeOptions(opts);
     });
   }, []);
 

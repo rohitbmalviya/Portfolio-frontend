@@ -6,7 +6,6 @@
 import { SectionHeading } from '@/components/ui/section-heading';
 import { ProjectCard } from './project-card';
 import { getProjects } from '@/lib/api';
-import { FALLBACK_PROJECTS } from '@/lib/fallback-data';
 import type { ProjectsGridData } from '@/lib/types';
 
 interface ProjectsGridSectionProps {
@@ -15,8 +14,7 @@ interface ProjectsGridSectionProps {
 }
 
 export async function ProjectsGridSection({ data, sectionNumber }: ProjectsGridSectionProps) {
-  let projects = await getProjects();
-  if (projects.length === 0) projects = FALLBACK_PROJECTS;
+  const projects = await getProjects();
 
   // Filter
   let filtered = projects;

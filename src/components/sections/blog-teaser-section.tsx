@@ -8,7 +8,6 @@ import { ArrowRight } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { BlogCard } from '@/components/sections/blog-card';
 import { getBlogPosts } from '@/lib/api';
-import { FALLBACK_BLOG_POSTS } from '@/lib/fallback-data';
 import type { BlogTeaserData } from '@/lib/types';
 
 interface BlogTeaserSectionProps {
@@ -17,8 +16,7 @@ interface BlogTeaserSectionProps {
 }
 
 export async function BlogTeaserSection({ data, sectionNumber }: BlogTeaserSectionProps) {
-  let posts = await getBlogPosts();
-  if (posts.length === 0) posts = FALLBACK_BLOG_POSTS;
+  const posts = await getBlogPosts();
 
   // Honor selection filter; default (mode absent or 'latest') = show by limit
   const displayPosts =

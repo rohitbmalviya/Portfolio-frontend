@@ -8,6 +8,7 @@ import type { Metadata, Viewport } from 'next';
 import { Space_Grotesk, Inter, JetBrains_Mono } from 'next/font/google';
 import { ThemeProvider } from '@/components/ui/theme-provider';
 import { SITE_OWNER, SITE_TITLE, SITE_TITLE_TEMPLATE } from '@/lib/site';
+import { getSiteSettings } from '@/lib/api';
 import './globals.css';
 
 // ── Fonts via next/font (self-hosted subset, no external request) ──
@@ -33,63 +34,77 @@ const jetbrainsMono = JetBrains_Mono({
   display: 'swap',
 });
 
-// ── Metadata defaults ─────────────────────────────────────────
+// ── Site URL (infra constant — not CMS-driven) ────────────────
 
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL ?? 'https://rohitmalviya.dev';
 
-export const metadata: Metadata = {
-  metadataBase: new URL(SITE_URL),
-  title: {
-    default: SITE_TITLE,
-    template: SITE_TITLE_TEMPLATE,
-  },
-  description:
-    'Full-stack engineer (2+ yrs) building production SaaS & bank-grade systems across TypeScript, Go, Python & Java. Architected a Monte Carlo platform for Siam Commercial Bank.',
-  authors: [{ name: SITE_OWNER, url: SITE_URL }],
-  creator: SITE_OWNER,
-  openGraph: {
-    type: 'website',
-    locale: 'en_US',
-    url: SITE_URL,
-    siteName: SITE_OWNER,
-    title: SITE_TITLE,
-    description:
-      'Full-stack engineer building production SaaS & bank-grade systems across TypeScript, Go, Python & Java.',
-    images: [
-      {
-        url: '/og-default.png',
-        width: 1200,
-        height: 630,
-        alt: SITE_TITLE,
-      },
-    ],
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: SITE_TITLE,
-    description: 'Full-stack engineer building production SaaS & bank-grade systems.',
-    images: ['/og-default.png'],
-  },
-  robots: {
-    index: true,
-    follow: true,
-    googleBot: {
+// ── Dynamic metadata (title / description / OG / twitter from CMS) ──
+
+export async function generateMetadata(): Promise<Metadata> {
+  const settings = await getSiteSettings();
+
+  const ownerName = settings?.name ?? SITE_OWNER;
+  const siteTitle = settings?.ogTitle ?? SITE_TITLE;
+  // Fully backend-driven: OG description → tagline. May be undefined when absent.
+  const siteDescription = settings?.ogDescription ?? settings?.tagline ?? undefined;
+
+  return {
+    // ── Infra (hardcoded — not CMS-driven) ──────────────────
+    metadataBase: new URL(SITE_URL),
+    icons: {
+      icon: [
+        { url: '/favicon.svg', type: 'image/svg+xml' },
+        { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
+      ],
+      shortcut: '/favicon.svg',
+      apple: '/apple-touch-icon.png',
+    },
+    robots: {
       index: true,
       follow: true,
-      'max-video-preview': -1,
-      'max-image-preview': 'large',
-      'max-snippet': -1,
+      googleBot: {
+        index: true,
+        follow: true,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
     },
-  },
-  icons: {
-    icon: [
-      { url: '/favicon.svg', type: 'image/svg+xml' },
-      { url: '/favicon-32.png', sizes: '32x32', type: 'image/png' },
-    ],
-    shortcut: '/favicon.svg',
-    apple: '/apple-touch-icon.png',
-  },
-};
+
+    // ── CMS-driven (with static string fallbacks) ────────────
+    title: {
+      default: siteTitle,
+      template: SITE_TITLE_TEMPLATE,
+    },
+    description: siteDescription,
+    authors: [{ name: ownerName, url: SITE_URL }],
+    creator: ownerName,
+    openGraph: {
+      type: 'website',
+      locale: 'en_US',
+      url: SITE_URL,
+      siteName: ownerName,
+      title: siteTitle,
+      description: siteDescription,
+      images: [
+        {
+          url: '/og-default.png',
+          width: 1200,
+          height: 630,
+          alt: siteTitle,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: siteTitle,
+      description: siteDescription,
+      images: ['/og-default.png'],
+    },
+  };
+}
+
+// ── Viewport (static infra — not CMS-driven) ──────────────────
 
 export const viewport: Viewport = {
   themeColor: [

@@ -5,32 +5,15 @@
 //  empty groups already omitted and skills sorted by `order`.
 //  The per-section selection filter (mode/ids/groups) is applied
 //  here on top of the API result.
-//  Offline fallback: if getSkillsGrouped() returns [], FALLBACK_SKILLS
-//  are shaped into the same SkillGroupSection[] structure locally.
+//  When the API is down, getSkillsGrouped() returns [] and the
+//  section renders nothing — graceful, not crashing.
 //  Server component.
 // ============================================================
 
 import { SectionHeading } from '@/components/ui/section-heading';
 import { SkillIcon } from '@/components/ui/skill-icon';
 import { getSkillsGrouped } from '@/lib/api';
-import { FALLBACK_SKILLS } from '@/lib/fallback-data';
-import { SKILL_GROUP_ORDER, SKILL_GROUP_LABELS } from '@/lib/skill-groups';
-import type { SkillsData, Skill, SkillGroupSection } from '@/lib/types';
-
-/** Shape FALLBACK_SKILLS into the same SkillGroupSection[] the API would return. */
-function groupFallbackSkills(skills: Skill[]): SkillGroupSection[] {
-  const map: Record<string, Skill[]> = {};
-  for (const s of skills) {
-    (map[s.group] ??= []).push(s);
-  }
-  return SKILL_GROUP_ORDER
-    .filter((g) => (map[g]?.length ?? 0) > 0)
-    .map((g) => ({
-      group: g,
-      label: SKILL_GROUP_LABELS[g],
-      skills: (map[g] ?? []).sort((a, b) => a.order - b.order),
-    }));
-}
+import type { SkillsData, SkillGroupSection } from '@/lib/types';
 
 // ── Component ─────────────────────────────────────────────────
 
@@ -40,11 +23,8 @@ interface SkillsSectionProps {
 }
 
 export async function SkillsSection({ data, sectionNumber }: SkillsSectionProps) {
-  // Fetch grouped skills from the API; fall back to local data when offline.
+  // Fetch grouped skills from the API; returns [] when the API is unreachable.
   let sections: SkillGroupSection[] = await getSkillsGrouped();
-  if (sections.length === 0) {
-    sections = groupFallbackSkills(FALLBACK_SKILLS);
-  }
 
   // Apply per-section-instance selection filter.
   // This is a data.mode concern (set in the CMS section config), not

@@ -47,16 +47,11 @@ interface ContactSectionProps {
 export async function ContactSection({ data, sectionNumber }: ContactSectionProps) {
   // Fetch settings to resolve location — cached at 5 min (ISR).
   const settings = await getSiteSettings();
-  const location = settings?.location ?? 'Pune, India';
+  const location = settings?.location;
 
-  // Derive the primary email: prefer a link of type 'email', then legacy
-  // data.email, then env var, then hardcoded fallback.
+  // Derive the primary email from section data only — no env or hardcoded fallback.
   const emailLink = data.links?.find((l) => l.type === 'email');
-  const email =
-    emailLink?.value ??
-    data.email ??
-    process.env.NEXT_PUBLIC_CONTACT_EMAIL ??
-    'rohitbmalviya@gmail.com';
+  const email = emailLink?.value ?? data.email ?? undefined;
 
   // If there is a resume-type link in data.links, that takes precedence.
   // Otherwise, fall back to the legacy data.resumeUrl field for backward-compat.
@@ -82,36 +77,42 @@ export async function ContactSection({ data, sectionNumber }: ContactSectionProp
           {/* Interactive contact form — only when enabled in the section */}
           {data.showForm && <ContactForm email={email} />}
 
-          {/* Primary email CTA */}
-          <div className="flex flex-wrap items-center gap-4">
-            <LinkButton
-              href={`mailto:${email}`}
-              variant="primary"
-              aria-label={`Send email to ${email}`}
-            >
-              <Mail size={16} aria-hidden="true" />
-              {email}
-            </LinkButton>
+          {/* Primary email CTA — only rendered when an email address is available */}
+          {(email || legacyResumeUrl) && (
+            <div className="flex flex-wrap items-center gap-4">
+              {email && (
+                <LinkButton
+                  href={`mailto:${email}`}
+                  variant="primary"
+                  aria-label={`Send email to ${email}`}
+                >
+                  <Mail size={16} aria-hidden="true" />
+                  {email}
+                </LinkButton>
+              )}
 
-            {legacyResumeUrl && (
-              <LinkButton
-                href={legacyResumeUrl}
-                target="_blank"
-                rel="noopener noreferrer"
-                variant="ghost"
-                aria-label="Download resume PDF"
-              >
-                <Download size={16} aria-hidden="true" />
-                Download résumé
-              </LinkButton>
-            )}
-          </div>
+              {legacyResumeUrl && (
+                <LinkButton
+                  href={legacyResumeUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  variant="ghost"
+                  aria-label="Download resume PDF"
+                >
+                  <Download size={16} aria-hidden="true" />
+                  Download résumé
+                </LinkButton>
+              )}
+            </div>
+          )}
 
-          {/* Location — sourced from SiteSettings, falls back to literal */}
-          <p className="flex items-center gap-2 font-mono text-[13px] text-[--muted]">
-            <MapPin size={14} aria-hidden="true" />
-            {location}
-          </p>
+          {/* Location — sourced from SiteSettings; omitted when absent */}
+          {location && (
+            <p className="flex items-center gap-2 font-mono text-[13px] text-[--muted]">
+              <MapPin size={14} aria-hidden="true" />
+              {location}
+            </p>
+          )}
 
           {/* Links row — new dynamic list if present, legacy socials otherwise */}
           {hasNewLinks && nonEmailLinks.length > 0 ? (

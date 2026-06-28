@@ -8,7 +8,6 @@ import { ArrowRight } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { ProjectCard } from './project-card';
 import { getProjects } from '@/lib/api';
-import { FALLBACK_PROJECTS } from '@/lib/fallback-data';
 import type { FeaturedProjectsData } from '@/lib/types';
 
 interface FeaturedProjectsSectionProps {
@@ -17,8 +16,7 @@ interface FeaturedProjectsSectionProps {
 }
 
 export async function FeaturedProjectsSection({ data, sectionNumber }: FeaturedProjectsSectionProps) {
-  let projects = await getProjects();
-  if (projects.length === 0) projects = FALLBACK_PROJECTS;
+  const projects = await getProjects();
 
   const limit = data.limit ?? 4;
   let featured: typeof projects;

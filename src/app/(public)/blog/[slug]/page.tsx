@@ -14,7 +14,6 @@ import rehypeSlug from 'rehype-slug';
 import rehypeHighlight from 'rehype-highlight';
 import { Calendar, Clock, ArrowLeft } from 'lucide-react';
 import { getBlogPost, getBlogPosts } from '@/lib/api';
-import { FALLBACK_BLOG_POSTS } from '@/lib/fallback-data';
 import { Tag } from '@/components/ui/tag';
 import { ScreenshotLightbox, LightboxTrigger, LightboxImg } from '@/components/projects/screenshot-lightbox';
 import { formatBlogDate, readingTimeLabel } from '@/lib/utils';
@@ -27,7 +26,7 @@ interface Props {
 }
 
 export async function generateStaticParams() {
-  const posts = await getBlogPosts().catch(() => FALLBACK_BLOG_POSTS);
+  const posts = await getBlogPosts();
   return posts.map((p) => ({ slug: p.slug }));
 }
 
@@ -59,11 +58,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default async function BlogPostPage({ params }: Props) {
   const { slug } = await params;
-  let post = await getBlogPost(slug);
-
-  if (!post) {
-    post = FALLBACK_BLOG_POSTS.find((p) => p.slug === slug) ?? null;
-  }
+  const post = await getBlogPost(slug);
 
   if (!post) notFound();
 

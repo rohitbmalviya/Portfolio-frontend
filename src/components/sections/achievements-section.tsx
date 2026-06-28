@@ -7,7 +7,6 @@ import { Trophy } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { ScreenshotLightbox, LightboxTrigger } from '@/components/projects/screenshot-lightbox';
 import { getAchievements } from '@/lib/api';
-import { FALLBACK_ACHIEVEMENTS } from '@/lib/fallback-data';
 import type { AchievementsData } from '@/lib/types';
 
 interface AchievementsSectionProps {
@@ -16,8 +15,7 @@ interface AchievementsSectionProps {
 }
 
 export async function AchievementsSection({ data, sectionNumber }: AchievementsSectionProps) {
-  const fetched = await getAchievements();
-  const all = fetched.length > 0 ? fetched : FALLBACK_ACHIEVEMENTS;
+  const all = await getAchievements();
 
   // Honor selection filter; default (mode absent or 'all') = show everything
   const achievements =

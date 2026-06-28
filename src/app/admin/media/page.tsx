@@ -21,12 +21,8 @@ import {
 } from '@/components/projects/screenshot-lightbox';
 import { formatBlogDate } from '@/lib/utils';
 import { getConfigOptions } from '@/lib/api';
-import { MEDIA_CATEGORY_LABELS } from '@/lib/media';
 
 // ── Category section order ────────────────────────────────────
-
-// Fallback grouping order — used when the config API returns nothing.
-const CATEGORIES = MEDIA_CATEGORY_LABELS;
 
 /**
  * Groups media by category and orders groups by `categoryOrder`.
@@ -63,8 +59,8 @@ function MediaContent() {
   const [media, setMedia] = useState<MediaRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  // Category order driven from config API; falls back to the hardcoded CATEGORIES constant.
-  const [categoryOrder, setCategoryOrder] = useState<readonly string[]>(CATEGORIES);
+  // Category order driven solely from config API — backend is the source of truth.
+  const [categoryOrder, setCategoryOrder] = useState<readonly string[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -84,10 +80,10 @@ function MediaContent() {
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load category order from config; fall back to the hardcoded CATEGORIES constant.
+  // Load category order from config — backend is the sole source of truth.
   useEffect(() => {
     getConfigOptions('media_categories').then((opts) => {
-      if (opts.length > 0) setCategoryOrder(opts.map((o) => o.value));
+      setCategoryOrder(opts.map((o) => o.value));
     });
   }, []);
 

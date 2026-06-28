@@ -7,17 +7,17 @@
 // ============================================================
 
 import type { Metadata } from 'next';
-import { getPage } from '@/lib/api';
+import { getPage, getSiteSettings } from '@/lib/api';
 import { SectionRenderer } from '@/components/sections/section-renderer';
 import { SITE_TITLE } from '@/lib/site';
+import { buildPageMetadata } from '@/lib/seo';
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
-  title: SITE_TITLE,
-  description:
-    'Full-stack engineer (2+ yrs) building production SaaS & bank-grade systems across TypeScript, Go, Python & Java. Architected a Monte Carlo platform for Siam Commercial Bank.',
-};
+export async function generateMetadata(): Promise<Metadata> {
+  const [page, settings] = await Promise.all([getPage('home'), getSiteSettings()]);
+  return buildPageMetadata({ page, settings, fallbackTitle: SITE_TITLE });
+}
 
 export default async function HomePage() {
   const page = await getPage('home');

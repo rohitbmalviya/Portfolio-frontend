@@ -18,7 +18,6 @@ import {
 } from '@/lib/admin-api';
 import { getConfigOptions } from '@/lib/api';
 import type { ConfigOption } from '@/lib/api';
-import { CONTACT_LINK_TYPE_OPTIONS } from '@/lib/contact-link-types';
 import Link from 'next/link';
 import {
   AdminInput,
@@ -919,11 +918,11 @@ function EducationForm({ data, onChange }: { data: AnyObj; onChange: (d: Section
 
 function ContactForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
   const links: { type: string; value: string }[] = data.links ?? [];
-  const [linkTypeOptions, setLinkTypeOptions] = useState<ConfigOption[]>(CONTACT_LINK_TYPE_OPTIONS);
+  const [linkTypeOptions, setLinkTypeOptions] = useState<ConfigOption[]>([]);
 
   useEffect(() => {
     getConfigOptions('contact_link_types').then((opts) => {
-      if (opts.length > 0) setLinkTypeOptions(opts);
+      setLinkTypeOptions(opts);
     });
   }, []);
 

@@ -1,12 +1,11 @@
 // ============================================================
 //  ExperienceSection — timeline of work experience.
-//  Fetches from API or falls back. Server component.
+//  Fetches from API; renders nothing when API is down. Server component.
 // ============================================================
 
 import { Building2 } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
 import { getExperience } from '@/lib/api';
-import { FALLBACK_EXPERIENCE } from '@/lib/fallback-data';
 import { formatDate } from '@/lib/utils';
 import type { ExperienceData } from '@/lib/types';
 
@@ -16,8 +15,7 @@ interface ExperienceSectionProps {
 }
 
 export async function ExperienceSection({ data, sectionNumber }: ExperienceSectionProps) {
-  const fetched = await getExperience();
-  const all = fetched.length > 0 ? fetched : FALLBACK_EXPERIENCE;
+  const all = await getExperience();
 
   // Honor selection filter; default (mode absent or 'all') = show everything
   const experiences =

@@ -5,9 +5,8 @@
 //  with section numbers, theme toggle. Mobile: hamburger menu.
 //
 //  Links come from GET /api/pages/nav (fetched server-side in
-//  the public layout and passed as `navItems`). Falls back to
-//  FALLBACK_NAV when the API is unreachable so the site still
-//  renders correctly.
+//  the public layout and passed as `navItems`). When the list
+//  is empty the nav bar still renders logo and theme toggle.
 // ============================================================
 
 import { useState } from 'react';
@@ -17,16 +16,6 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { cn } from '@/lib/utils';
 import { SITE_OWNER } from '@/lib/site';
 import type { NavPage } from '@/lib/types';
-
-// ── Static fallback ───────────────────────────────────────────
-// Used when `navItems` prop is empty/undefined (API unreachable).
-
-const FALLBACK_NAV: NavPage[] = [
-  { slug: 'home',     title: 'Home',    navLabel: 'home',    navOrder: 0 },
-  { slug: 'projects', title: 'Work',    navLabel: 'work',    navOrder: 1 },
-  { slug: 'blog',     title: 'Blog',    navLabel: 'blog',    navOrder: 2 },
-  { slug: 'contact',  title: 'Contact', navLabel: 'contact', navOrder: 3 },
-];
 
 // ── Helpers ───────────────────────────────────────────────────
 
@@ -55,8 +44,7 @@ interface NavProps {
 export function Nav({ navItems }: NavProps) {
   const [mobileOpen, setMobileOpen] = useState(false);
 
-  // Use API-driven items if non-empty, otherwise fall back to static set
-  const effectiveItems = navItems && navItems.length > 0 ? navItems : FALLBACK_NAV;
+  const effectiveItems = navItems ?? [];
   const NAV_LINKS = toNavLinks(effectiveItems);
 
   return (
