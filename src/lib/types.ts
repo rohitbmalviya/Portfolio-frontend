@@ -387,3 +387,29 @@ export interface ApiList<T> {
   data: T[];
   total?: number;
 }
+
+// ── Contact ───────────────────────────────────────────────────
+
+export type ContactMessageDirection = 'inbound' | 'outbound';
+export type ContactMessageSource = 'web' | 'app' | 'gmail' | 'notification';
+
+export interface ContactMessage {
+  id: string;
+  direction: ContactMessageDirection;
+  source: ContactMessageSource;
+  body: string;
+  createdAt: string;
+}
+
+export interface ContactThread {
+  id: string;
+  name: string;
+  email: string;
+  subject?: string;
+  unread: boolean;
+  lastMessageAt: string;
+  createdAt: string;
+  messageCount?: number;
+  lastSnippet?: string;
+  messages?: ContactMessage[];
+}

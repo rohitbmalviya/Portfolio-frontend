@@ -18,6 +18,7 @@ import {
   GraduationCap,
   Trophy,
   Image,
+  Mail,
   Settings,
   SlidersHorizontal,
   LogOut,
@@ -39,6 +40,7 @@ const NAV_ITEMS = [
   { href: '/admin/education', icon: GraduationCap, label: 'Education' },
   { href: '/admin/achievements', icon: Trophy, label: 'Achievements' },
   { href: '/admin/media', icon: Image, label: 'Media' },
+  { href: '/admin/messages', icon: Mail, label: 'Messages' },
   { href: '/admin/config', icon: SlidersHorizontal, label: 'Configuration' },
   { href: '/admin/settings', icon: Settings, label: 'Settings' },
 ];
@@ -126,13 +128,11 @@ export function AdminSidebar({ user }: Props) {
                   title={collapsed ? item.label : undefined}
                   aria-current={active ? 'page' : undefined}
                 >
-                  <item.icon
-                    size={16}
-                    aria-hidden="true"
-                    className="shrink-0"
-                  />
+                  <span className="shrink-0">
+                    <item.icon size={16} aria-hidden="true" />
+                  </span>
                   {!collapsed && (
-                    <span className="truncate">{item.label}</span>
+                    <span className="flex-1 truncate">{item.label}</span>
                   )}
                 </Link>
               </li>

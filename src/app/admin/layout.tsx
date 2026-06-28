@@ -30,7 +30,7 @@ export default function AdminLayout({
   return (
     <AdminAuthGuard>
       {(user) => (
-        <div className="flex min-h-screen" style={{ backgroundColor: 'var(--bg)' }}>
+        <div className="flex h-screen overflow-hidden" style={{ backgroundColor: 'var(--bg)' }}>
           <AdminSidebar user={user} />
           <main className="flex-1 min-w-0 overflow-y-auto">
             {children}

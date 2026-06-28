@@ -26,6 +26,8 @@ import type {
   SiteSettings,
   ConfigOption,
   Configuration,
+  ContactMessage,
+  ContactThread,
 } from './types';
 
 const BASE = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:4000';
@@ -524,6 +526,66 @@ export const adminConfig = {
     }),
 };
 
+// ── Contact (admin) ───────────────────────────────────────────
+
+/** ContactThread with messages guaranteed to be present (returned by getThread). */
+export type ContactThreadDetail = ContactThread & { messages: ContactMessage[] };
+
+export const adminContact = {
+  /** GET /api/contact/threads — list all threads, newest-last-message first. */
+  listThreads: () => adminFetch<ContactThread[]>('/api/contact/threads'),
+
+  /** GET /api/contact/unread-count — returns { count } of unread threads. */
+  unreadCount: () => adminFetch<{ count: number }>('/api/contact/unread-count'),
+
+  /** GET /api/contact/threads/:id — full thread with all messages. */
+  getThread: (id: string) =>
+    adminFetch<ContactThreadDetail>(`/api/contact/threads/${id}`),
+
+  /** PATCH /api/contact/threads/:id/read — marks thread as read. */
+  markRead: (id: string) =>
+    adminFetch<void>(`/api/contact/threads/${id}/read`, { method: 'PATCH' }),
+
+  /** POST /api/contact/threads/:id/reply — sends a reply. */
+  reply: (id: string, body: string) =>
+    adminFetch<ContactMessage>(`/api/contact/threads/${id}/reply`, {
+      method: 'POST',
+      body: JSON.stringify({ body }),
+    }),
+
+  /** DELETE /api/contact/threads/:id — permanently removes a thread. */
+  remove: (id: string) =>
+    adminFetch<void>(`/api/contact/threads/${id}`, { method: 'DELETE' }),
+
+  /** POST /api/contact/sync — triggers a Gmail/IMAP sync on the backend. */
+  sync: () =>
+    adminFetch<void>('/api/contact/sync', { method: 'POST' }),
+
+  /**
+   * POST /api/contact/compose — create a new outbound thread.
+   * Returns the newly-created thread with its messages array populated.
+   */
+  compose: (payload: {
+    to: string;
+    name?: string;
+    subject?: string;
+    body: string;
+  }) =>
+    adminFetch<ContactThreadDetail>('/api/contact/compose', {
+      method: 'POST',
+      body: JSON.stringify(payload),
+    }),
+
+  /**
+   * PATCH /api/contact/read-all — mark every unread thread as read.
+   * Returns the number of threads updated.
+   */
+  readAll: () =>
+    adminFetch<{ updated: number }>('/api/contact/read-all', {
+      method: 'PATCH',
+    }),
+};
+
 // ── Helpers re-exported for convenience ───────────────────────
 
-export type { PageType, SectionType, ConfigOption, Configuration };
+export type { PageType, SectionType, ConfigOption, Configuration, ContactMessage, ContactThread };

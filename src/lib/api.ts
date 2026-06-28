@@ -217,4 +217,30 @@ export async function getConfigOptions(key: string): Promise<ConfigOption[]> {
   }
 }
 
+// ── Contact (public form submission) ─────────────────────────
+
+/**
+ * POST /api/contact — submits a contact form.
+ * Uses a plain fetch (not apiFetch) because this is a client-side
+ * mutation, not an ISR-cached read. Returns true on success,
+ * false on any network or HTTP error.
+ */
+export async function submitContact(payload: {
+  name: string;
+  email: string;
+  subject?: string;
+  message: string;
+}): Promise<boolean> {
+  try {
+    const res = await fetch(`${BASE_URL}/api/contact`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload),
+    });
+    return res.ok;
+  } catch {
+    return false;
+  }
+}
+
 export type { NavPage, ConfigOption, Configuration };
