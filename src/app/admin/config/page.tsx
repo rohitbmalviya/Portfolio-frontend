@@ -3,7 +3,7 @@
 // ============================================================
 //  Admin Configuration — manage option-list items for dropdowns.
 //  Seeded keys: contact_link_types, social_link_types,
-//               media_categories.
+//               skill_groups.
 //  No create/delete of whole sets; only edit items of each key.
 // ============================================================
 
@@ -191,7 +191,7 @@ function ConfigContent() {
         <EmptyState
           icon={<SlidersHorizontal size={20} />}
           title="No configuration sets found"
-          description="Seed the database to populate the seeded keys: contact_link_types, social_link_types, media_categories."
+          description="Seed the database to populate the seeded keys: contact_link_types, social_link_types, skill_groups."
         />
       ) : (
         <div className="flex flex-col gap-5">

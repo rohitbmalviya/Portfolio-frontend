@@ -10,7 +10,7 @@
 // ============================================================
 
 import { useEffect, useState } from 'react';
-import { Copy, Image, Check } from 'lucide-react';
+import { Copy, Image, Check, FileText } from 'lucide-react';
 import { adminMedia, type MediaRecord } from '@/lib/admin-api';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
@@ -20,9 +20,32 @@ import {
   LightboxTrigger,
 } from '@/components/projects/screenshot-lightbox';
 import { formatBlogDate } from '@/lib/utils';
-import { getConfigOptions } from '@/lib/api';
-
 // ── Category section order ────────────────────────────────────
+
+/**
+ * Display order for the media library. Mirrors the backend's
+ * ownerType → category labels (see media.service `categoryFor`).
+ * Any category not listed is appended alphabetically (see groupMedia).
+ */
+const MEDIA_CATEGORY_ORDER: readonly string[] = [
+  'Projects',
+  'Blogs',
+  'Page',
+  'Section',
+  'Experience',
+  'Education',
+  'Achievement',
+  'Settings',
+  'Raw',
+];
+
+/** A PDF (e.g. résumé) is not an image — it gets a distinct tile, not a thumbnail. */
+function isPdf(m: MediaRecord): boolean {
+  return (
+    m.type === 'application/pdf' ||
+    m.cloudinaryUrl.toLowerCase().endsWith('.pdf')
+  );
+}
 
 /**
  * Groups media by category and orders groups by `categoryOrder`.
@@ -59,8 +82,6 @@ function MediaContent() {
   const [media, setMedia] = useState<MediaRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [copiedId, setCopiedId] = useState<string | null>(null);
-  // Category order driven solely from config API — backend is the source of truth.
-  const [categoryOrder, setCategoryOrder] = useState<readonly string[]>([]);
 
   useEffect(() => {
     setLoading(true);
@@ -80,13 +101,6 @@ function MediaContent() {
       .finally(() => setLoading(false));
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Load category order from config — backend is the sole source of truth.
-  useEffect(() => {
-    getConfigOptions('media_categories').then((opts) => {
-      setCategoryOrder(opts.map((o) => o.value));
-    });
-  }, []);
-
   async function copyUrl(item: MediaRecord) {
     try {
       await navigator.clipboard.writeText(item.cloudinaryUrl);
@@ -98,7 +112,7 @@ function MediaContent() {
     }
   }
 
-  const groups = groupMedia(media, categoryOrder);
+  const groups = groupMedia(media, MEDIA_CATEGORY_ORDER);
 
   return (
     <AdminShell
@@ -116,10 +130,17 @@ function MediaContent() {
       ) : (
         <div className="flex flex-col gap-10">
           {groups.map(([category, items]) => {
-            const lightboxImages = items.map((m) => ({
-              url: m.cloudinaryUrl,
-              alt: m.alt ?? '',
-            }));
+            // PDFs aren't images — exclude them from the lightbox and track each
+            // image's index within the image-only array so the lightbox triggers
+            // line up correctly.
+            const lightboxImages = items
+              .filter((m) => !isPdf(m))
+              .map((m) => ({ url: m.cloudinaryUrl, alt: m.alt ?? '' }));
+            const imageIndexById = new Map<string, number>();
+            let imgIdx = 0;
+            for (const m of items) {
+              if (!isPdf(m)) imageIndexById.set(m.id, imgIdx++);
+            }
 
             return (
               <section key={category} aria-labelledby={`cat-heading-${category}`}>
@@ -147,7 +168,7 @@ function MediaContent() {
                 {/* Per-group lightbox wraps the grid */}
                 <ScreenshotLightbox screenshots={lightboxImages}>
                   <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                    {items.map((item, indexInGroup) => (
+                    {items.map((item) => (
                       <div
                         key={item.id}
                         className="group rounded-[10px] overflow-hidden border"
@@ -157,21 +178,39 @@ function MediaContent() {
                         }}
                       >
                         <div className="relative">
-                          {/* eslint-disable-next-line @next/next/no-img-element */}
-                          <img
-                            src={item.cloudinaryUrl}
-                            alt={item.alt ?? 'Uploaded media'}
-                            className="w-full h-32 object-cover block"
-                            loading="lazy"
-                            width={item.width ?? 300}
-                            height={item.height ?? 128}
-                          />
+                          {isPdf(item) ? (
+                            <a
+                              href={item.cloudinaryUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="flex flex-col items-center justify-center gap-2 w-full h-32"
+                              style={{ backgroundColor: 'var(--surface-2)', color: 'var(--muted)' }}
+                              title="Open PDF"
+                            >
+                              <FileText size={28} aria-hidden="true" />
+                              <span className="text-[11px] font-medium uppercase tracking-wide">
+                                PDF
+                              </span>
+                            </a>
+                          ) : (
+                            <>
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img
+                                src={item.cloudinaryUrl}
+                                alt={item.alt ?? 'Uploaded media'}
+                                className="w-full h-32 object-cover block"
+                                loading="lazy"
+                                width={item.width ?? 300}
+                                height={item.height ?? 128}
+                              />
 
-                          <LightboxTrigger
-                            index={indexInGroup}
-                            className="absolute inset-0 cursor-zoom-in"
-                            ariaLabel={`Zoom: ${item.alt ?? 'image'}`}
-                          />
+                              <LightboxTrigger
+                                index={imageIndexById.get(item.id) ?? 0}
+                                className="absolute inset-0 cursor-zoom-in"
+                                ariaLabel={`Zoom: ${item.alt ?? 'image'}`}
+                              />
+                            </>
+                          )}
 
                           {/* Hover overlay — copy URL only (pointer-events:none
                               passes clicks to the zoom trigger; the button opts in) */}
