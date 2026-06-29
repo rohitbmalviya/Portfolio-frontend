@@ -550,6 +550,7 @@ export type MediaOwnerType =
   | 'education'
   | 'achievement'
   | 'page'
+  | 'section'
   | 'settings';
 
 /**

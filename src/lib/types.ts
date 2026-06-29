@@ -212,7 +212,7 @@ export interface CtaData {
 
 export interface GalleryData {
   heading?: string;
-  images: MediaItem[];
+  images: { mediaId?: string; url: string; alt?: string }[];
 }
 
 // Discriminated union for exhaustive section rendering

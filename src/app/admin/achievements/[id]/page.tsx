@@ -123,6 +123,7 @@ function AchievementFormContent({ achievementId }: { achievementId: string | nul
           originalMediaId: null,
           ownerId,
           ownerType: 'achievement',
+          usage: 'image',
           category: 'Raw',
         });
         if (errors.length > 0) {
@@ -139,6 +140,7 @@ function AchievementFormContent({ achievementId }: { achievementId: string | nul
           originalMediaId: originalMediaIdRef.current,
           ownerId,
           ownerType: 'achievement',
+          usage: 'image',
           category: 'Raw',
         });
         if (errors.length > 0) {

@@ -118,6 +118,7 @@ function BlogFormContent({ postId }: { postId: string | null }) {
           originalMediaIds: [],
           ownerId,
           ownerType: 'blog',
+          usage: 'image',
           category: MediaCategory.Blogs,
           entitySlug: form.slug,
         });
@@ -135,6 +136,7 @@ function BlogFormContent({ postId }: { postId: string | null }) {
           originalMediaIds: originalMediaIdsRef.current,
           ownerId,
           ownerType: 'blog',
+          usage: 'image',
           category: MediaCategory.Blogs,
           entitySlug: form.slug,
         });

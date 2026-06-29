@@ -25,6 +25,8 @@ interface ReconcileMultiArgs {
   originalMediaIds: string[];
   ownerId: string;
   ownerType: MediaOwnerType;
+  /** Media usage label stored on every uploaded record (e.g. 'image', 'gallery'). */
+  usage: string;
   /** Cloudinary category bucket ('Projects' | 'Blogs' | 'Raw'). */
   category?: string;
   /** Cloudinary folder slug — required for Projects / Blogs. */
@@ -45,6 +47,7 @@ export async function reconcileMultiMedia({
   originalMediaIds,
   ownerId,
   ownerType,
+  usage,
   category,
   entitySlug,
 }: ReconcileMultiArgs): Promise<string[]> {
@@ -73,6 +76,7 @@ export async function reconcileMultiMedia({
           entitySlug,
           ownerId,
           ownerType,
+          usage,
           order: i,
           alt: v.alt,
         });
@@ -99,8 +103,8 @@ interface ReconcileSingleArgs {
   originalMediaId: string | null;
   ownerId: string;
   ownerType: MediaOwnerType;
-  /** 'resume' | 'og' — forwarded to the Media record. */
-  usage?: string;
+  /** Usage label stored on the Media record (e.g. 'logo', 'og', 'resume', 'image'). */
+  usage: string;
   category?: string;
   entitySlug?: string;
 }

@@ -148,6 +148,7 @@ function ExperienceFormContent({ experienceId }: { experienceId: string | null }
           originalMediaId: null,
           ownerId,
           ownerType: 'experience',
+          usage: 'logo',
           category: 'Raw',
         });
         if (errors.length > 0) {
@@ -164,6 +165,7 @@ function ExperienceFormContent({ experienceId }: { experienceId: string | null }
           originalMediaId: originalMediaIdRef.current,
           ownerId,
           ownerType: 'experience',
+          usage: 'logo',
           category: 'Raw',
         });
         if (errors.length > 0) {

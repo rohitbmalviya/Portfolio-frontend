@@ -156,6 +156,7 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
           originalMediaIds: [],
           ownerId,
           ownerType: 'project',
+          usage: 'image',
           category: MediaCategory.Projects,
           entitySlug: form.slug,
         });
@@ -173,6 +174,7 @@ function ProjectFormContent({ projectId }: { projectId: string | null }) {
           originalMediaIds: originalMediaIdsRef.current,
           ownerId,
           ownerType: 'project',
+          usage: 'image',
           category: MediaCategory.Projects,
           entitySlug: form.slug,
         });

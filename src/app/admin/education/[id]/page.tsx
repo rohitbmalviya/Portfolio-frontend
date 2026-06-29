@@ -143,6 +143,7 @@ function EducationFormContent({ educationId }: { educationId: string | null }) {
           originalMediaId: null,
           ownerId,
           ownerType: 'education',
+          usage: 'logo',
           category: 'Raw',
         });
         if (errors.length > 0) {
@@ -159,6 +160,7 @@ function EducationFormContent({ educationId }: { educationId: string | null }) {
           originalMediaId: originalMediaIdRef.current,
           ownerId,
           ownerType: 'education',
+          usage: 'logo',
           category: 'Raw',
         });
         if (errors.length > 0) {

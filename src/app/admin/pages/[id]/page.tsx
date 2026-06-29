@@ -27,8 +27,8 @@ import {
   Trash2,
   X,
 } from 'lucide-react';
-import { adminPages, adminSections, uploadMedia } from '@/lib/admin-api';
-import { reconcileSingleMedia } from '@/lib/media-save';
+import { adminPages, adminSections } from '@/lib/admin-api';
+import { reconcileSingleMedia, reconcileMultiMedia } from '@/lib/media-save';
 import type { Page, Section, SectionType, SectionData } from '@/lib/types';
 import { AdminShell } from '@/components/admin/admin-shell';
 import { ToastProvider, useToast } from '@/components/admin/toast';
@@ -489,32 +489,47 @@ function PageSectionEditorContent({ pageId }: { pageId: string }) {
   async function handleSaveData(section: Section, data: SectionData) {
     setSavingId(section.id);
     try {
-      // For GALLERY sections, upload any pending image picks before saving the
-      // JSON blob. Pending items have `file instanceof File` and a blob objectURL.
-      let saveData = data;
       if (section.type === 'GALLERY') {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const d = data as Record<string, any>;
-        if (Array.isArray(d.images)) {
+        const images: ImageValue[] = Array.isArray(d.images) ? d.images : [];
+
+        // Derive the mediaIds that were present when this section was loaded.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const originalMediaIds = ((section.data as Record<string, any>).images ?? [])
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const resolved = await Promise.allSettled<{ url: string; alt: string }>(
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            (d.images as any[]).map(async (img: any, i: number) => {
-              if (img.file instanceof File) {
-                const media = await uploadMedia(img.file, { category: 'Raw', order: i });
-                return { url: media.cloudinaryUrl, alt: img.alt ?? '' };
-              }
-              return { url: String(img.url ?? ''), alt: String(img.alt ?? '') };
-            }),
-          );
-          const images = resolved
-            .map((r) => (r.status === 'fulfilled' ? r.value : null))
-            .filter((img): img is { url: string; alt: string } => img !== null && Boolean(img.url));
-          saveData = { ...d, images } as SectionData;
+          .filter((i: any) => i.mediaId)
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          .map((i: any) => i.mediaId as string);
+
+        // Reconcile: delete removed records, upload pending files, patch order.
+        const mediaErrors = await reconcileMultiMedia({
+          values: images,
+          originalMediaIds,
+          ownerId: section.id,
+          ownerType: 'section',
+          usage: 'gallery',
+          category: 'Raw',
+        });
+
+        if (mediaErrors.length > 0) {
+          toastError(`Gallery media had issues: ${mediaErrors.join('; ')}`);
         }
+
+        // Save section data without inline image URLs.
+        // Images are now owned by the Media table and re-attached on read.
+        await adminSections.update(section.id, {
+          data: { ...d, images: [] },
+        });
+
+        success('Section saved.');
+        setExpandedId(null);
+        // Reload so the gallery re-populates from Media with fresh mediaIds.
+        await load();
+        return;
       }
 
-      const updated = await adminSections.update(section.id, { data: saveData });
+      const updated = await adminSections.update(section.id, { data });
       setSections((prev) => prev.map((s) => (s.id === section.id ? updated : s)));
       success('Section saved.');
       setExpandedId(null);
