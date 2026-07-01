@@ -19,6 +19,7 @@ import { MetricsSection } from './metrics-section';
 import { RichTextSection } from './rich-text-section';
 import { CtaSection } from './cta-section';
 import { GallerySection } from './gallery-section';
+import { ContentBlockSection } from './content-block-section';
 
 import type { Section, SectionType } from '@/lib/types';
 import type {
@@ -26,6 +27,7 @@ import type {
   FeaturedProjectsData, ProjectsGridData, BlogTeaserData,
   AchievementsData, EducationData, ContactData,
   MetricsData, RichTextData, CtaData, GalleryData,
+  ContentBlockData,
 } from '@/lib/types';
 
 // Section numbers for display (aligned with sample's "01.", "02." pattern)
@@ -46,8 +48,9 @@ export async function SectionRenderer({ sections }: SectionRendererProps) {
 
   // Sections that do NOT receive a sequential number prefix.
   // Everything else (ABOUT, SKILLS, EXPERIENCE, …) is numbered.
+  // CONTENT_BLOCK renders its own custom header (eyebrow + heading) so no number is needed.
   const NON_NUMBERED_SECTIONS = new Set<SectionType>([
-    'HERO', 'METRICS', 'RICH_TEXT', 'CTA', 'GALLERY',
+    'HERO', 'METRICS', 'RICH_TEXT', 'CTA', 'GALLERY', 'CONTENT_BLOCK',
   ]);
   let numberedCount = 0;
 
@@ -143,6 +146,15 @@ export async function SectionRenderer({ sections }: SectionRendererProps) {
 
           case 'GALLERY':
             return <GallerySection key={section.id} data={data as GalleryData} />;
+
+          case 'CONTENT_BLOCK':
+            return (
+              <ContentBlockSection
+                key={section.id}
+                data={data as ContentBlockData}
+                sectionNumber={num}
+              />
+            );
 
           default:
             // Unknown section type — render nothing in production, warn in dev

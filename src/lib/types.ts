@@ -19,7 +19,8 @@ export type SectionType =
   | 'METRICS'
   | 'RICH_TEXT'
   | 'CTA'
-  | 'GALLERY';
+  | 'GALLERY'
+  | 'CONTENT_BLOCK';
 
 /** DB-driven skill group — arbitrary string defined in the skill_groups Config key. */
 export type SkillGroup = string;
@@ -122,6 +123,7 @@ export interface SkillsData {
   /** @deprecated Legacy — when mode === 'selected': SkillGroup key names to include.
    *  Kept for backward-compat; prefer ids. */
   groups?: string[];
+  cta?: { label: string; href: string };
 }
 
 export interface ExperienceData {
@@ -129,6 +131,7 @@ export interface ExperienceData {
   source?: 'experience-table';
   mode?: 'all' | 'selected';
   ids?: string[];
+  cta?: { label: string; href: string };
 }
 
 export interface FeaturedProjectsData {
@@ -140,12 +143,14 @@ export interface FeaturedProjectsData {
   auto?: 'featured';
   limit?: number;
   mode?: 'all' | 'selected';
+  cta?: { label: string; href: string };
 }
 
 export interface ProjectsGridData {
   heading: string;
   filter?: 'all' | 'featured' | string;
   limit?: number;
+  cta?: { label: string; href: string };
 }
 
 export interface BlogTeaserData {
@@ -153,6 +158,7 @@ export interface BlogTeaserData {
   limit?: number;
   mode?: 'latest' | 'selected';
   ids?: string[];
+  cta?: { label: string; href: string };
 }
 
 export interface AchievementsData {
@@ -160,6 +166,7 @@ export interface AchievementsData {
   source?: 'achievements-table';
   mode?: 'all' | 'selected';
   ids?: string[];
+  cta?: { label: string; href: string };
 }
 
 export interface EducationItem {
@@ -175,6 +182,7 @@ export interface EducationData {
   ids?: string[];
   /** Legacy inline items — kept optional for backward compat with old sections */
   items?: EducationItem[];
+  cta?: { label: string; href: string };
 }
 
 export interface ContactLink {
@@ -215,6 +223,18 @@ export interface GalleryData {
   images: { mediaId?: string; url: string; alt?: string }[];
 }
 
+export interface ContentBlockData {
+  eyebrow?: string;
+  heading?: string;
+  paragraphs?: string[];
+  align?: 'left' | 'center';
+  source?: 'experience' | 'education' | 'skills' | 'projects' | 'achievements' | 'blog' | 'none';
+  mode?: 'all' | 'selected' | 'latest';
+  ids?: string[];
+  limit?: number;
+  cta?: { label: string; href: string };
+}
+
 // Discriminated union for exhaustive section rendering
 export type SectionData =
   | HeroData
@@ -231,6 +251,7 @@ export type SectionData =
   | RichTextData
   | CtaData
   | GalleryData
+  | ContentBlockData
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   | Record<string, any>;
 

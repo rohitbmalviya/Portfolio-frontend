@@ -1,11 +1,11 @@
 // ============================================================
-//  /blog/[slug] — Individual blog post.
-//  Renders MDX/markdown body with syntax highlighting.
-//  ISR: revalidate every 60s.
+//  BlogDetail — reusable detail view for a single BlogPost.
+//  Extracted from (public)/blog/[slug]/page.tsx so the same
+//  markup can be served by both the legacy /blog/[slug] route
+//  and the unified /[slug]/[item] route without duplication.
+//  Server component.
 // ============================================================
 
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import Link from 'next/link';
 import Image from 'next/image';
 import ReactMarkdown from 'react-markdown';
@@ -13,55 +13,12 @@ import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import rehypeHighlight from 'rehype-highlight';
 import { Calendar, Clock, ArrowLeft } from 'lucide-react';
-import { getBlogPost, getBlogPosts } from '@/lib/api';
 import { Tag } from '@/components/ui/tag';
 import { ScreenshotLightbox, LightboxTrigger, LightboxImg } from '@/components/projects/screenshot-lightbox';
 import { formatBlogDate, readingTimeLabel } from '@/lib/utils';
-import { SITE_OWNER } from '@/lib/site';
+import type { BlogPost } from '@/lib/types';
 
-export const revalidate = 60;
-
-interface Props {
-  params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  const posts = await getBlogPosts();
-  return posts.map((p) => ({ slug: p.slug }));
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
-  const post = await getBlogPost(slug);
-  if (!post) return { title: 'Post Not Found' };
-
-  return {
-    title: post.title,
-    description: post.excerpt,
-    openGraph: {
-      title: `${post.title} — ${SITE_OWNER}`,
-      description: post.excerpt,
-      type: 'article',
-      publishedTime: post.publishedAt ?? undefined,
-      images: post.coverImage
-        ? [{ url: post.coverImage, alt: post.title }]
-        : [],
-    },
-    twitter: {
-      card: 'summary_large_image',
-      title: post.title,
-      description: post.excerpt,
-      images: post.coverImage ? [post.coverImage] : [],
-    },
-  };
-}
-
-export default async function BlogPostPage({ params }: Props) {
-  const { slug } = await params;
-  const post = await getBlogPost(slug);
-
-  if (!post) notFound();
-
+export function BlogDetail({ post }: { post: BlogPost }) {
   // All zoomable images on this post: cover first, then markdown body images.
   const bodyImageUrls = post.body
     ? [...post.body.matchAll(/!\[[^\]]*\]\(([^)\s]+)/g)].map((m) => m[1])

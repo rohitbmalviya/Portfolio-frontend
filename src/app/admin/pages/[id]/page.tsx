@@ -64,6 +64,7 @@ const SECTION_TYPE_OPTIONS: { value: SectionType; label: string }[] = [
   { value: 'RICH_TEXT', label: 'Rich Text' },
   { value: 'CTA', label: 'Call to Action' },
   { value: 'GALLERY', label: 'Gallery' },
+  { value: 'CONTENT_BLOCK', label: 'Content Block' },
 ];
 
 // ── Page settings form type ───────────────────────────────────

@@ -4,6 +4,7 @@
 // ============================================================
 
 import { SectionHeading } from '@/components/ui/section-heading';
+import { SectionCta } from '@/components/ui/section-cta';
 import { ProjectCard } from './project-card';
 import { getProjects } from '@/lib/api';
 import type { ProjectsGridData } from '@/lib/types';
@@ -24,17 +25,22 @@ export async function ProjectsGridSection({ data, sectionNumber }: ProjectsGridS
     filtered = projects.filter((p) => p.tags.includes(data.filter!));
   }
 
-  if (data.limit) filtered = filtered.slice(0, data.limit);
+  // Only cap when limit is a positive number — no cap when unset/0
+  if (data.limit && data.limit > 0) filtered = filtered.slice(0, data.limit);
 
   return (
     <section className="py-16" aria-labelledby="projects-grid-heading">
       <div className="wrap">
-        <SectionHeading number={sectionNumber} title={data.heading || 'All Projects'} />
+        {data.heading ? (
+          <SectionHeading number={sectionNumber} title={data.heading} />
+        ) : null}
         <div className="grid grid-cols-1 md:grid-cols-2 gap-[22px]">
           {filtered.map((project) => (
             <ProjectCard key={project.id} project={project} />
           ))}
         </div>
+
+        <SectionCta cta={data.cta} />
       </div>
     </section>
   );

@@ -1,10 +1,11 @@
 // ============================================================
-//  /projects/[slug] — Project detail page.
-//  ISR: revalidate every 60s.
+//  ProjectDetail — reusable detail view for a single Project.
+//  Extracted from (public)/projects/[slug]/page.tsx so the same
+//  markup can be served by both the legacy /projects/[slug] route
+//  and the unified /[slug]/[item] route without duplication.
+//  Server component.
 // ============================================================
 
-import type { Metadata } from 'next';
-import { notFound } from 'next/navigation';
 import Image from 'next/image';
 import Link from 'next/link';
 import { ScreenshotLightbox, LightboxTrigger } from '@/components/projects/screenshot-lightbox';
@@ -13,46 +14,11 @@ import remarkGfm from 'remark-gfm';
 import rehypeSlug from 'rehype-slug';
 import rehypeHighlight from 'rehype-highlight';
 import { ExternalLink, ArrowLeft } from 'lucide-react';
-import { getProject, getProjects } from '@/lib/api';
 import { Tag } from '@/components/ui/tag';
 import { LinkButton } from '@/components/ui/button';
-import { SITE_OWNER } from '@/lib/site';
+import type { Project } from '@/lib/types';
 
-export const revalidate = 60;
-
-interface Props {
-  params: Promise<{ slug: string }>;
-}
-
-export async function generateStaticParams() {
-  const projects = await getProjects();
-  return projects.map((p) => ({ slug: p.slug }));
-}
-
-export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params;
-  const project = await getProject(slug);
-  if (!project) return { title: 'Project Not Found' };
-
-  return {
-    title: project.title,
-    description: project.oneLiner,
-    openGraph: {
-      title: `${project.title} — ${SITE_OWNER}`,
-      description: project.oneLiner,
-      images: project.screenshots[0]
-        ? [{ url: project.screenshots[0].url, alt: project.screenshots[0].alt || project.title }]
-        : [],
-    },
-  };
-}
-
-export default async function ProjectDetailPage({ params }: Props) {
-  const { slug } = await params;
-  const project = await getProject(slug);
-
-  if (!project) notFound();
-
+export function ProjectDetail({ project }: { project: Project }) {
   const hasScreenshot = project.screenshots && project.screenshots.length > 0;
 
   return (

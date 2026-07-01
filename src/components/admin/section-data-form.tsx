@@ -446,6 +446,7 @@ function SkillsForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionDat
           )}
         </div>
       )}
+      <CtaInputs data={data} onChange={onChange} />
       <Link
         href="/admin/skills"
         className="text-[12px] hover:opacity-75 transition-opacity self-start"
@@ -529,6 +530,7 @@ function ExperienceForm({ data, onChange }: { data: AnyObj; onChange: (d: Sectio
           )}
         </div>
       )}
+      <CtaInputs data={data} onChange={onChange} />
       <Link
         href="/admin/experience"
         className="text-[12px] hover:opacity-75 transition-opacity self-start"
@@ -620,6 +622,7 @@ function FeaturedProjectsForm({ data, onChange }: { data: AnyObj; onChange: (d: 
           )}
         </div>
       )}
+      <CtaInputs data={data} onChange={onChange} />
       <Link
         href="/admin/projects"
         className="text-[12px] hover:opacity-75 transition-opacity self-start"
@@ -653,6 +656,7 @@ function ProjectsGridForm({ data, onChange }: { data: AnyObj; onChange: (d: Sect
         }
         placeholder="Leave empty for all"
       />
+      <CtaInputs data={data} onChange={onChange} />
     </div>
   );
 }
@@ -739,6 +743,7 @@ function BlogTeaserForm({ data, onChange }: { data: AnyObj; onChange: (d: Sectio
           )}
         </div>
       )}
+      <CtaInputs data={data} onChange={onChange} />
       <Link
         href="/admin/blog"
         className="text-[12px] hover:opacity-75 transition-opacity self-start"
@@ -822,6 +827,7 @@ function AchievementsForm({ data, onChange }: { data: AnyObj; onChange: (d: Sect
           )}
         </div>
       )}
+      <CtaInputs data={data} onChange={onChange} />
       <Link
         href="/admin/achievements"
         className="text-[12px] hover:opacity-75 transition-opacity self-start"
@@ -905,6 +911,7 @@ function EducationForm({ data, onChange }: { data: AnyObj; onChange: (d: Section
           )}
         </div>
       )}
+      <CtaInputs data={data} onChange={onChange} />
       <Link
         href="/admin/education"
         className="text-[12px] hover:opacity-75 transition-opacity self-start"
@@ -1133,6 +1140,261 @@ function GalleryForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionDa
   );
 }
 
+// ── Shared CTA input pair ─────────────────────────────────────
+// Used by every typed collection section form (not ContentBlock).
+// Blanking both fields removes the cta key entirely on save.
+
+function CtaInputs({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
+  const cta = (data.cta as { label?: string; href?: string } | undefined) ?? {};
+
+  function updateCta(patch: Partial<{ label: string; href: string }>) {
+    const next = { ...cta, ...patch };
+    onChange({ ...data, cta: next.label || next.href ? next : undefined } as SectionData);
+  }
+
+  return (
+    <div>
+      <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+        CTA button (optional)
+      </p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+        <AdminInput
+          label="Label"
+          value={cta.label ?? ''}
+          onChange={(e) => updateCta({ label: e.target.value })}
+          placeholder="View all"
+        />
+        <AdminInput
+          label="URL"
+          value={cta.href ?? ''}
+          onChange={(e) => updateCta({ href: e.target.value })}
+          placeholder="https://… or /page"
+        />
+      </div>
+    </div>
+  );
+}
+
+function ContentBlockForm({ data, onChange }: { data: AnyObj; onChange: (d: SectionData) => void }) {
+  const paragraphs: string[] = data.paragraphs ?? [];
+  const source: string = (data.source as string) ?? 'none';
+  const mode: 'all' | 'selected' | 'latest' =
+    (data.mode as 'all' | 'selected' | 'latest') ?? 'all';
+  const selectedIds: string[] = Array.isArray(data.ids) ? (data.ids as string[]) : [];
+
+  // ── Dynamic id options (reloaded whenever source changes) ──
+  const [idOptions, setIdOptions] = useState<{ id: string; label: string }[]>([]);
+  const [loadingIds, setLoadingIds] = useState(false);
+
+  useEffect(() => {
+    if (!source || source === 'none') {
+      setIdOptions([]);
+      return;
+    }
+    setLoadingIds(true);
+    const load = async () => {
+      try {
+        if (source === 'projects') {
+          const items = await adminProjects.list();
+          setIdOptions(items.map((p) => ({ id: p.id, label: p.title })));
+        } else if (source === 'blog') {
+          const items = await adminBlog.list();
+          setIdOptions(items.map((p) => ({ id: p.id, label: p.title })));
+        } else if (source === 'experience') {
+          const items = await adminExperience.list();
+          setIdOptions(items.map((e) => ({ id: e.id, label: `${e.role} — ${e.company}` })));
+        } else if (source === 'education') {
+          const items = await adminEducation.list();
+          setIdOptions(items.map((e) => ({ id: e.id, label: `${e.degree} — ${e.school}` })));
+        } else if (source === 'achievements') {
+          const items = await adminAchievements.list();
+          setIdOptions(items.map((a) => ({ id: a.id, label: a.title })));
+        } else if (source === 'skills') {
+          const sections = await adminSkills.listGrouped();
+          const flat: { id: string; label: string }[] = [];
+          for (const sec of sections) {
+            for (const skill of sec.skills) {
+              flat.push({ id: skill.id, label: `${skill.name} (${sec.label})` });
+            }
+          }
+          setIdOptions(flat);
+        }
+      } catch {
+        // ignore loading errors — picker stays empty
+      } finally {
+        setLoadingIds(false);
+      }
+    };
+    void load();
+  }, [source]);
+
+  function toggleId(id: string) {
+    const next = selectedIds.includes(id)
+      ? selectedIds.filter((x) => x !== id)
+      : [...selectedIds, id];
+    field(data, onChange, 'ids', next);
+  }
+
+  return (
+    <div className="flex flex-col gap-4">
+      {/* ── Header fields ───────────────────────────────────── */}
+      <AdminInput
+        label="Eyebrow (optional mono label)"
+        value={data.eyebrow ?? ''}
+        onChange={(e) => field(data, onChange, 'eyebrow', e.target.value)}
+        placeholder="e.g. // Featured Work"
+      />
+      <AdminInput
+        label="Heading (optional)"
+        value={data.heading ?? ''}
+        onChange={(e) => field(data, onChange, 'heading', e.target.value)}
+      />
+
+      {/* ── Paragraphs ──────────────────────────────────────── */}
+      <div>
+        <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+          Paragraphs
+        </p>
+        {paragraphs.map((p, i) => (
+          <div key={i} className="flex flex-col gap-1.5 mb-2">
+            <AdminTextarea
+              value={p}
+              onChange={(e) => {
+                const next = [...paragraphs];
+                next[i] = e.target.value;
+                field(data, onChange, 'paragraphs', next);
+              }}
+              rows={3}
+            />
+            <div className="flex justify-end">
+              <AdminButton
+                variant="danger"
+                size="sm"
+                type="button"
+                aria-label="Remove paragraph"
+                onClick={() =>
+                  field(data, onChange, 'paragraphs', paragraphs.filter((_, j) => j !== i))
+                }
+              >
+                <Trash2 size={13} aria-hidden="true" /> Remove
+              </AdminButton>
+            </div>
+          </div>
+        ))}
+        <AdminButton
+          variant="ghost"
+          size="sm"
+          type="button"
+          onClick={() => field(data, onChange, 'paragraphs', [...paragraphs, ''])}
+        >
+          <Plus size={14} aria-hidden="true" /> Add paragraph
+        </AdminButton>
+      </div>
+
+      {/* ── Alignment ───────────────────────────────────────── */}
+      <AdminSelect
+        label="Alignment"
+        value={data.align ?? 'left'}
+        onChange={(e) => field(data, onChange, 'align', e.target.value)}
+        options={[
+          { value: 'left', label: 'Left' },
+          { value: 'center', label: 'Center' },
+        ]}
+      />
+
+      {/* ── Collection source ───────────────────────────────── */}
+      <AdminSelect
+        label="Collection source"
+        value={source}
+        onChange={(e) => {
+          const newSource = e.target.value || 'none';
+          // Clear ids when source changes — ids from one collection are not valid for another.
+          onChange({ ...data, source: newSource, ids: [] } as SectionData);
+        }}
+        options={[
+          { value: 'none', label: 'None (text only)' },
+          { value: 'experience', label: 'Experience' },
+          { value: 'education', label: 'Education' },
+          { value: 'skills', label: 'Skills' },
+          { value: 'projects', label: 'Projects' },
+          { value: 'achievements', label: 'Achievements' },
+          { value: 'blog', label: 'Blog posts' },
+        ]}
+      />
+
+      {source !== 'none' && (
+        <>
+          {/* ── Display mode ────────────────────────────────── */}
+          <AdminSelect
+            label="Display mode"
+            value={mode}
+            onChange={(e) => field(data, onChange, 'mode', e.target.value)}
+            options={[
+              { value: 'all', label: 'All' },
+              { value: 'latest', label: 'Latest (by limit)' },
+              { value: 'selected', label: 'Selected' },
+            ]}
+          />
+
+          {/* ── Limit ───────────────────────────────────────── */}
+          <AdminInput
+            label="Limit (leave empty for all)"
+            type="number"
+            value={data.limit ?? ''}
+            onChange={(e) =>
+              field(data, onChange, 'limit', e.target.value ? Number(e.target.value) : undefined)
+            }
+            placeholder="e.g. 3"
+            min={1}
+          />
+
+          {/* ── IDs multi-select (visible when mode === 'selected') */}
+          {mode === 'selected' && (
+            <div>
+              <p className="text-[13px] font-medium mb-2" style={{ color: 'var(--text)' }}>
+                Select items to display
+              </p>
+              {loadingIds ? (
+                <p className="text-[12px]" style={{ color: 'var(--muted)' }}>Loading…</p>
+              ) : (
+                <div
+                  className="max-h-[200px] overflow-y-auto rounded-[10px] border p-2 flex flex-col gap-0.5"
+                  style={{ borderColor: 'var(--border)', backgroundColor: 'var(--surface-2)' }}
+                >
+                  {idOptions.length === 0 ? (
+                    <p className="text-[12px] px-1" style={{ color: 'var(--muted)' }}>
+                      No items found.
+                    </p>
+                  ) : (
+                    idOptions.map((opt) => (
+                      <label
+                        key={opt.id}
+                        className="flex items-center gap-2 cursor-pointer py-1 px-2 rounded-[6px] transition-colors"
+                        style={{ color: 'var(--text)' }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.includes(opt.id)}
+                          onChange={() => toggleId(opt.id)}
+                          style={{ accentColor: 'var(--accent)' }}
+                        />
+                        <span className="text-[13px]">{opt.label}</span>
+                      </label>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* ── CTA ─────────────────────────────────────────── */}
+          <CtaInputs data={data} onChange={onChange} />
+        </>
+      )}
+    </div>
+  );
+}
+
 // ── Main component ────────────────────────────────────────────
 
 export function SectionDataForm({ type, data, onChange }: Props) {
@@ -1168,6 +1430,8 @@ export function SectionDataForm({ type, data, onChange }: Props) {
       return <CtaForm data={d} onChange={onChange} />;
     case 'GALLERY':
       return <GalleryForm data={d} onChange={onChange} />;
+    case 'CONTENT_BLOCK':
+      return <ContentBlockForm data={d} onChange={onChange} />;
     default:
       return (
         <p className="text-[13px]" style={{ color: 'var(--muted)' }}>

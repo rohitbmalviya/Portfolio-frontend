@@ -1,0 +1,200 @@
+// ============================================================
+//  /[slug]/[item] — Unified collection-item detail route.
+//
+//  [slug] = collection type  (projects | blog | experience |
+//                              education | achievements)
+//  [item] = item slug / id
+//
+//  Routing precedence during transition:
+//    /projects/:x  → handled by (public)/projects/[slug]/page.tsx (static wins)
+//    /blog/:x      → handled by (public)/blog/[slug]/page.tsx     (static wins)
+//    /experience/:x, /education/:x, /achievements/:x → THIS route
+//
+//  After the legacy folders are removed (cutover), this route
+//  will also serve /projects/:x and /blog/:x.
+//  ISR: revalidate every 60s.
+// ============================================================
+
+import type { Metadata } from 'next';
+import { notFound } from 'next/navigation';
+import {
+  getProjects,
+  getProject,
+  getBlogPosts,
+  getBlogPost,
+  getExperience,
+  getEducation,
+  getAchievements,
+} from '@/lib/api';
+import { ProjectDetail } from '@/components/pagedetail/project-detail';
+import { BlogDetail } from '@/components/pagedetail/blog-detail';
+import { ExperienceDetail } from '@/components/pagedetail/experience-detail';
+import { EducationDetail } from '@/components/pagedetail/education-detail';
+import { AchievementDetail } from '@/components/pagedetail/achievement-detail';
+import { SITE_OWNER } from '@/lib/site';
+
+export const revalidate = 60;
+
+interface Props {
+  params: Promise<{ slug: string; item: string }>;
+}
+
+// ── Static params — pre-render all known items at build time ──
+
+export async function generateStaticParams() {
+  const [projects, posts, experiences, educations, achievements] = await Promise.all([
+    getProjects(),
+    getBlogPosts(),
+    getExperience(),
+    getEducation(),
+    getAchievements(),
+  ]);
+
+  return [
+    ...projects.map((p) => ({ slug: 'projects', item: p.slug })),
+    ...posts.map((p) => ({ slug: 'blog', item: p.slug })),
+    ...experiences.map((e) => ({ slug: 'experience', item: e.id })),
+    ...educations.map((e) => ({ slug: 'education', item: e.id })),
+    ...achievements.map((a) => ({ slug: 'achievements', item: a.id })),
+  ];
+}
+
+// ── Metadata ──────────────────────────────────────────────────
+
+export async function generateMetadata({ params }: Props): Promise<Metadata> {
+  const { slug, item } = await params;
+
+  switch (slug) {
+    case 'projects': {
+      const project = await getProject(item);
+      if (!project) return { title: 'Project Not Found' };
+      return {
+        title: project.title,
+        description: project.oneLiner,
+        openGraph: {
+          title: `${project.title} — ${SITE_OWNER}`,
+          description: project.oneLiner,
+          images: project.screenshots[0]
+            ? [{ url: project.screenshots[0].url, alt: project.screenshots[0].alt || project.title }]
+            : [],
+        },
+      };
+    }
+
+    case 'blog': {
+      const post = await getBlogPost(item);
+      if (!post) return { title: 'Post Not Found' };
+      return {
+        title: post.title,
+        description: post.excerpt,
+        openGraph: {
+          title: `${post.title} — ${SITE_OWNER}`,
+          description: post.excerpt,
+          type: 'article',
+          publishedTime: post.publishedAt ?? undefined,
+          images: post.coverImage
+            ? [{ url: post.coverImage, alt: post.title }]
+            : [],
+        },
+        twitter: {
+          card: 'summary_large_image',
+          title: post.title,
+          description: post.excerpt,
+          images: post.coverImage ? [post.coverImage] : [],
+        },
+      };
+    }
+
+    case 'experience': {
+      const all = await getExperience();
+      const exp = all.find((e) => e.id === item);
+      if (!exp) return { title: 'Experience Not Found' };
+      return {
+        title: `${exp.role} at ${exp.company}`,
+        description: exp.bullets[0] ?? `${exp.role} at ${exp.company}`,
+        openGraph: {
+          title: `${exp.role} at ${exp.company} — ${SITE_OWNER}`,
+          description: exp.bullets[0] ?? `${exp.role} at ${exp.company}`,
+        },
+      };
+    }
+
+    case 'education': {
+      const all = await getEducation();
+      const edu = all.find((e) => e.id === item);
+      if (!edu) return { title: 'Education Not Found' };
+      return {
+        title: `${edu.degree} — ${edu.school}`,
+        description: edu.detail ?? `${edu.degree} at ${edu.school}`,
+        openGraph: {
+          title: `${edu.degree} — ${edu.school} · ${SITE_OWNER}`,
+          description: edu.detail ?? `${edu.degree} at ${edu.school}`,
+        },
+      };
+    }
+
+    case 'achievements': {
+      const all = await getAchievements();
+      const achievement = all.find((a) => a.id === item);
+      if (!achievement) return { title: 'Achievement Not Found' };
+      return {
+        title: achievement.title,
+        description: achievement.description,
+        openGraph: {
+          title: `${achievement.title} — ${SITE_OWNER}`,
+          description: achievement.description,
+          images: achievement.image
+            ? [{ url: achievement.image, alt: achievement.title }]
+            : [],
+        },
+      };
+    }
+
+    default:
+      return {};
+  }
+}
+
+// ── Page ──────────────────────────────────────────────────────
+
+export default async function UnifiedDetailPage({ params }: Props) {
+  const { slug, item } = await params;
+
+  switch (slug) {
+    case 'projects': {
+      const project = await getProject(item);
+      if (!project) notFound();
+      return <ProjectDetail project={project} />;
+    }
+
+    case 'blog': {
+      const post = await getBlogPost(item);
+      if (!post) notFound();
+      return <BlogDetail post={post} />;
+    }
+
+    case 'experience': {
+      const all = await getExperience();
+      const exp = all.find((e) => e.id === item);
+      if (!exp) notFound();
+      return <ExperienceDetail item={exp} />;
+    }
+
+    case 'education': {
+      const all = await getEducation();
+      const edu = all.find((e) => e.id === item);
+      if (!edu) notFound();
+      return <EducationDetail item={edu} />;
+    }
+
+    case 'achievements': {
+      const all = await getAchievements();
+      const achievement = all.find((a) => a.id === item);
+      if (!achievement) notFound();
+      return <AchievementDetail item={achievement} />;
+    }
+
+    default:
+      notFound();
+  }
+}

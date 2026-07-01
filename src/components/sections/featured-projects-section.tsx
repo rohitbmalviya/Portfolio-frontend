@@ -3,9 +3,8 @@
 //  Fetches featured projects from API. Server component.
 // ============================================================
 
-import Link from 'next/link';
-import { ArrowRight } from 'lucide-react';
 import { SectionHeading } from '@/components/ui/section-heading';
+import { SectionCta } from '@/components/ui/section-cta';
 import { ProjectCard } from './project-card';
 import { getProjects } from '@/lib/api';
 import type { FeaturedProjectsData } from '@/lib/types';
@@ -18,7 +17,10 @@ interface FeaturedProjectsSectionProps {
 export async function FeaturedProjectsSection({ data, sectionNumber }: FeaturedProjectsSectionProps) {
   const projects = await getProjects();
 
-  const limit = data.limit ?? 4;
+  // Only apply a limit when data.limit is a positive number — no hard default cap.
+  const cap = <T,>(arr: T[]): T[] =>
+    data.limit && data.limit > 0 ? arr.slice(0, data.limit) : arr;
+
   let featured: typeof projects;
 
   if (data.mode === 'selected') {
@@ -31,22 +33,24 @@ export async function FeaturedProjectsSection({ data, sectionNumber }: FeaturedP
       const idSet = new Set(idsToUse);
       featured = projects.filter((p) => idSet.has(p.id));
     } else {
-      featured = projects.slice(0, limit);
+      featured = cap(projects);
     }
   } else {
     // Default: auto-select featured projects; legacy projectIds honored for old data
-    featured = projects.filter((p) => p.featured).slice(0, limit);
-    if (featured.length === 0) featured = projects.slice(0, limit);
+    featured = cap(projects.filter((p) => p.featured));
+    if (featured.length === 0) featured = cap(projects);
     if (data.projectIds && data.projectIds.length > 0) {
       const idSet = new Set(data.projectIds);
-      featured = projects.filter((p) => idSet.has(p.id)).slice(0, limit);
+      featured = cap(projects.filter((p) => idSet.has(p.id)));
     }
   }
 
   return (
     <section className="py-16" id="work" aria-labelledby="featured-projects-heading">
       <div className="wrap">
-        <SectionHeading number={sectionNumber} title={data.heading || 'Selected Work'} />
+        {data.heading ? (
+          <SectionHeading number={sectionNumber} title={data.heading} />
+        ) : null}
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-[22px]">
           {featured.map((project) => (
@@ -54,16 +58,7 @@ export async function FeaturedProjectsSection({ data, sectionNumber }: FeaturedP
           ))}
         </div>
 
-        {/* View all */}
-        <div className="mt-8 text-center">
-          <Link
-            href="/projects"
-            className="inline-flex items-center gap-2 font-mono text-[13px] text-[--accent] hover:opacity-75 transition-opacity"
-          >
-            View all projects
-            <ArrowRight size={14} aria-hidden="true" />
-          </Link>
-        </div>
+        <SectionCta cta={data.cta} />
       </div>
     </section>
   );
